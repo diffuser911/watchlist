@@ -400,7 +400,7 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyWatchList</h1>
-      <span class="version-badge">v3.2</span>
+      <span class="version-badge">v3.3</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" id="btnExport">📥 Export</button>
@@ -441,7 +441,7 @@
   <div id="itemsContainer"></div>
 
   <script>
-    // 1. Unregister all service workers and purge caches immediately
+    // 1. Purge obsolete service workers & browser cache
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(regs) {
         for (var i = 0; i < regs.length; i++) regs[i].unregister();
@@ -453,7 +453,7 @@
       });
     }
 
-    // 2. Safe OMDb API Key retrieval
+    // 2. Safe API Key Resolution
     var OMDB_KEY = "YOUR_OMDB_KEY";
     try {
       if (typeof OMDB_API_KEY !== 'undefined') OMDB_KEY = OMDB_API_KEY;
@@ -490,12 +490,14 @@
           norm.seasons = item.seasons.map(function(s) {
             return {
               season: Number(s.season),
+              year: s.year || '',
               episodes: Array.isArray(s.episodes) ? s.episodes.map(function(ep) {
                 return {
                   id: String(ep.id),
                   name: ep.name || '',
                   number: ep.number,
                   season: ep.season,
+                  airdate: ep.airdate || '',
                   watched: ep.watched === true,
                   favorite: ep.favorite === true
                 };
@@ -507,7 +509,6 @@
       });
     }
 
-    // Load initial data
     try {
       var raw = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
       watchlist = normalizeWatchlist(JSON.parse(raw));
@@ -663,6 +664,10 @@
               }
               var allWatched = sTotal > 0 && sWatched === sTotal;
 
+              // Display Year logic: use saved year or parse from first episode
+              var sYear = s.year || (s.episodes[0] && s.episodes[0].airdate ? s.episodes[0].airdate.slice(0, 4) : '');
+              var yearLabel = sYear ? ' <span style="color:#888; font-size:12px; font-weight:normal;">(' + escapeHtml(sYear) + ')</span>' : '';
+
               var key = item.id + '_' + s.season;
               if (expandedSeasons[key] === undefined) {
                 expandedSeasons[key] = (sWatched < sTotal) && (sIdx === 0 || (item.seasons[sIdx - 1] && item.seasons[sIdx - 1].episodes.every(function(e) { return e.watched; })));
@@ -673,7 +678,7 @@
                 '<div class="season-header" data-action="toggle-season" data-show="' + item.id + '" data-season="' + s.season + '">' +
                   '<div class="season-title-group" style="pointer-events:none;">' +
                     '<span class="season-indicator">' + (isSeasonOpen ? '▼' : '▶') + '</span>' +
-                    '<span class="season-title">Season ' + s.season + '</span>' +
+                    '<span class="season-title">Season ' + s.season + yearLabel + '</span>' +
                     '<span class="season-stats">(' + sWatched + '/' + sTotal + ')</span>' +
                   '</div>' +
                   '<button type="button" class="bulk-btn" data-action="bulk-season" data-show="' + item.id + '" data-season="' + s.season + '" data-mark="' + (!allWatched) + '">' +
@@ -728,7 +733,7 @@
       container.innerHTML = html;
     }
 
-    // 5. Native Centralized Event Delegation
+    // 5. Centralized Event Delegation
     document.addEventListener('click', function(e) {
       var target = e.target.closest('[data-action]');
       if (!target) return;
@@ -1010,12 +1015,20 @@
           var seasonsMap = {};
           rawEpisodes.forEach(function(ep) {
             var sNum = ep.season;
-            if (!seasonsMap[sNum]) seasonsMap[sNum] = { season: sNum, episodes: [] };
+            if (!seasonsMap[sNum]) {
+              var sYear = (ep.airdate && ep.airdate.length >= 4) ? ep.airdate.slice(0, 4) : '';
+              seasonsMap[sNum] = {
+                season: sNum,
+                year: sYear,
+                episodes: []
+              };
+            }
             seasonsMap[sNum].episodes.push({
               id: String(ep.id),
               name: ep.name || ('Episode ' + ep.number),
               number: ep.number,
               season: ep.season,
+              airdate: ep.airdate || '',
               watched: false,
               favorite: false
             });
@@ -1040,7 +1053,6 @@
       }
     }
 
-    // Initial mount
     appRender();
   </script>
 </body>
