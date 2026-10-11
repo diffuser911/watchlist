@@ -8,13 +8,13 @@
   <link rel="manifest" href="./manifest.json">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; }
+    body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; user-select: none; }
     
     /* Top Bar */
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     .top-title-group { display: flex; align-items: baseline; gap: 8px; }
     .top-bar h1 { font-size: 22px; font-weight: bold; }
-    .version-btn { color: #38bdf8; font-size: 11px; cursor: pointer; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; }
+    .version-badge { color: #38bdf8; font-size: 11px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; }
     .top-actions { display: flex; gap: 6px; }
 
     /* Tabs */
@@ -41,7 +41,7 @@
     .sub-controls { display: flex; gap: 8px; align-items: center; }
     .view-toggle { background: #1e1e1e; border: 1px solid #333; color: #aaa; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 
-    /* Standard Card */
+    /* Cards */
     .card-container { background: #1e1e1e; border-radius: 8px; margin-bottom: 10px; overflow: hidden; border: 1px solid #2a2a2a; }
     .card { display: flex; gap: 12px; padding: 12px; align-items: flex-start; cursor: pointer; }
     .poster { width: 55px; height: 80px; object-fit: cover; border-radius: 4px; background: #2a2a2a; flex-shrink: 0; }
@@ -57,20 +57,27 @@
     .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 5px; }
     .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 4px; margin-left: 6px; }
 
-    /* Compact List Layout */
+    /* Compact Mode */
     .compact-mode .card { padding: 8px 10px; align-items: center; }
     .compact-mode .poster { width: 36px; height: 50px; }
     .compact-mode .sub, .compact-mode .tags, .compact-mode .btn-cal { display: none; }
     .compact-mode .title { font-size: 13px; margin-bottom: 0; }
 
-    /* Modals */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: flex-end; z-index: 9999; }
+    /* Modals - Strictly Isolated Pointer Events */
+    .modal-overlay { 
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8); 
+      display: none; justify-content: center; align-items: flex-end; 
+      z-index: 9999; pointer-events: none; 
+    }
+    .modal-overlay.open { 
+      display: flex !important; pointer-events: auto !important; 
+    }
     .modal-sheet { background: #181818; width: 100%; max-width: 600px; max-height: 85vh; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #333; }
     .modal-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
     .modal-close { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 4px 8px; }
 
-    /* Episode Rows inside Modal */
+    /* Episode Rows */
     .season-block { margin-bottom: 16px; }
     .season-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .season-title { color: #fbbf24; font-size: 14px; font-weight: bold; }
@@ -82,9 +89,6 @@
     .episode-label.watched { color: #666; text-decoration: line-through; }
     .star-btn { background: none; border: none; font-size: 17px; cursor: pointer; color: #555; padding: 0 6px; }
     .star-btn.active { color: #facc15; }
-    
-    .notes-list { line-height: 1.6; font-size: 13px; color: #bbb; padding-left: 18px; margin-top: 8px; }
-    .notes-list li { margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -96,7 +100,7 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackList</h1>
-      <span class="version-btn" onclick="openVersionModal()">v2.3 (Notes)</span>
+      <span class="version-badge">v2.3</span>
     </div>
     <div class="top-actions">
       <button class="btn-action" onclick="exportBackup()">📥 Export</button>
@@ -151,25 +155,6 @@
     </div>
   </div>
 
-  <!-- Version Notes Modal -->
-  <div class="modal-overlay" id="versionModal" onclick="closeVersionModal(event)">
-    <div class="modal-sheet" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h3 style="font-size:16px;">TrackList v2.3 Notes</h3>
-        <button class="modal-close" onclick="closeVersionModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <h4 style="color:#fbbf24; font-size:14px; margin-bottom:6px;">Changelog:</h4>
-        <ul class="notes-list">
-          <li><strong>Direct Import Fix:</strong> Resolved Android Chrome file picker trap by isolating the input element and binding explicit change handlers.</li>
-          <li><strong>Event Loop Unfreeze:</strong> Fixed modal closure state to prevent unhandled reference errors from freezing card taps.</li>
-          <li><strong>Legacy Backup Auto-Format:</strong> Full compatibility with historical JSON schema exports.</li>
-          <li><strong>Compact List Mode:</strong> Quick toggling between detailed posters and dense rows.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
   <script>
     const OMDB_API_KEY = "9f85df42"; 
     let currentTab = 'watchlist'; 
@@ -203,12 +188,12 @@
       });
     }
 
-    // Initialize state
+    // Initialize state cleanly
     try {
       const rawStored = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
       watchlist = normalizeWatchlist(JSON.parse(rawStored));
     } catch (e) {
-      console.warn("Storage initial load failed:", e);
+      console.warn("Storage initial load error:", e);
       watchlist = [];
     }
 
@@ -216,10 +201,10 @@
       try {
         localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
       } catch (e) {
-        console.error("Save to localStorage failed:", e);
+        console.error("Save error:", e);
       }
       renderDisplay();
-      if (currentModalShowId && document.getElementById('episodesModal').style.display === 'flex') {
+      if (currentModalShowId && document.getElementById('episodesModal').classList.contains('open')) {
         renderModalContent();
       }
     }
@@ -227,7 +212,8 @@
     function switchTab(tab) {
       currentTab = tab;
       ['watchlist', 'tv', 'movie'].forEach(t => {
-        document.getElementById(`tab-${t}`).className = (t === tab) ? 'tab active' : 'tab';
+        const btn = document.getElementById(`tab-${t}`);
+        if (btn) btn.className = (t === tab) ? 'tab active' : 'tab';
       });
 
       const searchSection = document.getElementById('searchSection');
@@ -235,18 +221,23 @@
       const searchInput = document.getElementById('searchInput');
       const resBox = document.getElementById('searchResults');
 
-      searchInput.value = '';
-      resBox.innerHTML = '';
-      resBox.style.display = 'none';
+      if (searchInput) searchInput.value = '';
+      if (resBox) {
+        resBox.innerHTML = '';
+        resBox.style.display = 'none';
+      }
       currentSearchResults = [];
 
       if (tab === 'watchlist') {
-        searchSection.style.display = 'none';
-        controlsSection.style.display = 'block';
+        if (searchSection) searchSection.style.display = 'none';
+        if (controlsSection) controlsSection.style.display = 'block';
       } else {
-        searchSection.style.display = 'block';
-        controlsSection.style.display = 'none';
-        searchInput.placeholder = `Search ${tab === 'tv' ? 'TV shows' : 'movies'} online...`;
+        if (searchSection) searchSection.style.display = 'block';
+        if (controlsSection) controlsSection.style.display = 'none';
+        if (searchInput) {
+          searchInput.placeholder = `Search ${tab === 'tv' ? 'TV shows' : 'movies'} online...`;
+          searchInput.focus();
+        }
       }
 
       renderDisplay();
@@ -256,13 +247,16 @@
       currentStatusFilter = status;
       const pills = document.querySelectorAll('.status-pills .pill');
       const labels = ['all', 'watching', 'to_watch', 'favorites', 'completed'];
-      pills.forEach((p, idx) => p.className = (labels[idx] === status) ? 'pill active' : 'pill');
+      pills.forEach((p, idx) => {
+        if (p) p.className = (labels[idx] === status) ? 'pill active' : 'pill';
+      });
       renderDisplay();
     }
 
     function toggleViewMode() {
       isCompactView = !isCompactView;
-      document.getElementById('viewToggleBtn').textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
+      const btn = document.getElementById('viewToggleBtn');
+      if (btn) btn.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
       renderDisplay();
     }
 
@@ -429,20 +423,14 @@
     function openShowModal(id) {
       currentModalShowId = String(id);
       renderModalContent();
-      document.getElementById('episodesModal').style.display = 'flex';
+      const modal = document.getElementById('episodesModal');
+      if (modal) modal.classList.add('open');
     }
 
     function closeModal() {
       currentModalShowId = null;
-      document.getElementById('episodesModal').style.display = 'none';
-    }
-
-    function openVersionModal() {
-      document.getElementById('versionModal').style.display = 'flex';
-    }
-
-    function closeVersionModal() {
-      document.getElementById('versionModal').style.display = 'none';
+      const modal = document.getElementById('episodesModal');
+      if (modal) modal.classList.remove('open');
     }
 
     function renderModalContent() {
@@ -493,7 +481,7 @@
     }
 
     function toggleEpisodeFavorite(showId, epId, event) {
-      event.stopPropagation();
+      if (event) event.stopPropagation();
       watchlist = watchlist.map(item => {
         if (String(item.id) !== String(showId)) return item;
         const updatedSeasons = (item.seasons || []).map(s => ({
@@ -543,11 +531,12 @@
     function renderDisplay() {
       const container = document.getElementById('itemsContainer');
       const heading = document.getElementById('listHeading');
+      if (!container || !heading) return;
       
       let itemsToRender = [];
 
       if (currentTab === 'watchlist') {
-        const filter = document.getElementById('filterInput').value.toLowerCase().trim();
+        const filter = (document.getElementById('filterInput')?.value || '').toLowerCase().trim();
         itemsToRender = watchlist.filter(item => {
           if (currentStatusFilter === 'to_watch' && (item.type !== 'movie' || item.watched)) return false;
           if (currentStatusFilter === 'watching') {
@@ -586,7 +575,7 @@
           return;
         }
       } else {
-        const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+        const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
         if (!searchQuery || searchQuery.length < 2) {
           heading.style.display = 'none';
           container.innerHTML = '';
@@ -668,35 +657,43 @@
       downloadAnchor.remove();
     }
 
-    // Direct invocation without label event interception
     function triggerImport() {
       const fileInput = document.getElementById('importFileInput');
-      fileInput.value = '';
-      fileInput.click();
+      if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+      }
     }
 
-    // Attached via addEventListener for complete platform reliability
-    document.getElementById('importFileInput').addEventListener('change', function(e) {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
+    // Set up file change listener when DOM is ready
+    window.addEventListener('DOMContentLoaded', () => {
+      const fileInput = document.getElementById('importFileInput');
+      if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        try {
-          const raw = JSON.parse(evt.target.result);
-          if (Array.isArray(raw)) {
-            watchlist = normalizeWatchlist(raw);
-            save();
-            alert(`Watchlist restored successfully! Loaded ${watchlist.length} items.`);
-          } else {
-            alert('Invalid backup structure: expected a JSON array.');
-          }
-        } catch (err) {
-          console.error(err);
-          alert('Could not parse JSON file. Ensure it is a valid backup.');
-        }
-      };
-      reader.readAsText(file);
+          const reader = new FileReader();
+          reader.onload = function(evt) {
+            try {
+              const raw = JSON.parse(evt.target.result);
+              if (Array.isArray(raw)) {
+                watchlist = normalizeWatchlist(raw);
+                save();
+                alert(`Watchlist restored successfully! Loaded ${watchlist.length} items.`);
+              } else {
+                alert('Invalid backup structure: expected a JSON array.');
+              }
+            } catch (err) {
+              console.error(err);
+              alert('Could not parse JSON file. Ensure it is a valid backup.');
+            }
+          };
+          reader.readAsText(file);
+        });
+      }
+
+      renderDisplay();
     });
 
     if ('serviceWorker' in navigator) {
@@ -705,8 +702,6 @@
           .catch(err => console.error('SW Error', err));
       });
     }
-
-    renderDisplay();
   </script>
 </body>
 </html>
