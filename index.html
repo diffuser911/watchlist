@@ -17,6 +17,7 @@
     .top-actions { display: flex; gap: 8px; }
 
     /* Buttons */
+    button { -webkit-appearance: none; appearance: none; }
     .btn-action { background: #262626; border: 1px solid #444; color: #eee; min-height: 38px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
     .btn-action:active { background: #383838; }
     .btn-watched { background: #14532d !important; color: #4ade80 !important; border-color: #15803d !important; }
@@ -95,40 +96,40 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyWatchList</h1>
-      <span class="version-badge">v2.9</span>
+      <span class="version-badge">v3.0</span>
     </div>
     <div class="top-actions">
-      <button type="button" class="btn-action" onclick="appExport()">📥 Export</button>
-      <button type="button" class="btn-action" onclick="appImport()">📤 Import</button>
+      <button type="button" class="btn-action" id="btnExport">📥 Export</button>
+      <button type="button" class="btn-action" id="btnImport">📤 Import</button>
     </div>
   </div>
 
   <div class="tabs">
-    <button type="button" class="tab active" id="tabWatchlist" onclick="appSwitchTab('watchlist')">My Watchlist</button>
-    <button type="button" class="tab" id="tabTv" onclick="appSwitchTab('tv')">Add TV Shows</button>
-    <button type="button" class="tab" id="tabMovie" onclick="appSwitchTab('movie')">Add Movies</button>
+    <button type="button" class="tab active" data-tab="watchlist">My Watchlist</button>
+    <button type="button" class="tab" data-tab="tv">Add TV Shows</button>
+    <button type="button" class="tab" data-tab="movie">Add Movies</button>
   </div>
 
   <div id="searchSection" style="display:none;">
     <div class="search-row">
-      <input type="text" id="searchInput" placeholder="Search..." onkeydown="if(event.key==='Enter') appSearch()">
-      <button type="button" class="btn-search" onclick="appSearch()">Search</button>
+      <input type="text" id="searchInput" placeholder="Search...">
+      <button type="button" class="btn-search" id="btnSearch">Search</button>
     </div>
     <div id="searchResults" class="dropdown" style="display:none;"></div>
   </div>
 
   <div id="controlsSection" class="controls-panel">
     <div class="status-pills">
-      <button type="button" class="pill active" id="pillAll" onclick="appSetFilter('all')">All</button>
-      <button type="button" class="pill" id="pillWatching" onclick="appSetFilter('watching')">📺 Watching</button>
-      <button type="button" class="pill" id="pillToWatch" onclick="appSetFilter('to_watch')">🍿 To Watch</button>
-      <button type="button" class="pill" id="pillFavorites" onclick="appSetFilter('favorites')">⭐ Favorites</button>
-      <button type="button" class="pill" id="pillCompleted" onclick="appSetFilter('completed')">✓ Finished</button>
+      <button type="button" class="pill active" data-filter="all">All</button>
+      <button type="button" class="pill" data-filter="watching">📺 Watching</button>
+      <button type="button" class="pill" data-filter="to_watch">🍿 To Watch</button>
+      <button type="button" class="pill" data-filter="favorites">⭐ Favorites</button>
+      <button type="button" class="pill" data-filter="completed">✓ Finished</button>
     </div>
 
     <div class="sub-controls">
-      <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor..." oninput="appRender()">
-      <button type="button" class="view-toggle" id="viewToggleBtn" onclick="appToggleCompact()">☰ Compact</button>
+      <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor...">
+      <button type="button" class="view-toggle" id="viewToggleBtn">☰ Compact</button>
     </div>
   </div>
 
@@ -136,531 +137,555 @@
   <div id="itemsContainer"></div>
 
   <script>
-    // 1. Force purge any stale service workers/caches that freeze mobile Chrome
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        for (let r of regs) r.unregister();
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-    }
-
-    // 2. Safe API Key Resolution
-    let OMDB_KEY = "YOUR_OMDB_KEY";
-    try {
-      if (typeof OMDB_API_KEY !== 'undefined') OMDB_KEY = OMDB_API_KEY;
-    } catch(e) {}
-
-    // 3. State Management
-    let currentTab = 'watchlist'; 
-    let currentStatusFilter = 'all'; 
-    let isCompactView = false;
-    let expandedShows = {};
-    let expandedSeasons = {};
-    let currentSearchResults = [];
-    let watchlist = [];
-
-    function normalizeWatchlist(items) {
-      if (!Array.isArray(items)) return [];
-      return items.map(item => {
-        const norm = {
-          ...item,
-          id: String(item.id),
-          watched: item.watched === true,
-        };
-        if (norm.type === 'tv' && Array.isArray(norm.seasons)) {
-          norm.seasons = norm.seasons.map(s => ({
-            ...s,
-            episodes: (s.episodes || []).map(ep => ({
-              ...ep,
-              id: String(ep.id),
-              watched: ep.watched === true,
-              favorite: ep.favorite === true
-            }))
-          }));
-        }
-        return norm;
-      });
-    }
-
-    try {
-      const raw = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
-      watchlist = normalizeWatchlist(JSON.parse(raw));
-    } catch (e) {
-      watchlist = [];
-    }
-
-    function appSave() {
+    (function() {
+      // Configuration fallback
+      let OMDB_KEY = "YOUR_OMDB_KEY";
       try {
-        localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
+        if (typeof OMDB_API_KEY !== 'undefined') OMDB_KEY = OMDB_API_KEY;
       } catch (e) {}
-      appRender();
-    }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
+      let currentTab = 'watchlist';
+      let currentStatusFilter = 'all';
+      let isCompactView = false;
+      let expandedShows = {};
+      let expandedSeasons = {};
+      let currentSearchResults = [];
+      let watchlist = [];
 
-    function getStats(seasons = []) {
-      let total = 0, watched = 0, favorites = 0;
-      seasons.forEach(s => s.episodes.forEach(ep => {
-        total++;
-        if (ep.watched) watched++;
-        if (ep.favorite) favorites++;
-      }));
-      return { total, watched, favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
-    }
-
-    // 4. Exposed Window Actions (Guaranteed Touch Response)
-    window.appSwitchTab = function(tab) {
-      currentTab = tab;
-      document.getElementById('tabWatchlist').className = tab === 'watchlist' ? 'tab active' : 'tab';
-      document.getElementById('tabTv').className = tab === 'tv' ? 'tab active' : 'tab';
-      document.getElementById('tabMovie').className = tab === 'movie' ? 'tab active' : 'tab';
-
-      const searchSection = document.getElementById('searchSection');
-      const controlsSection = document.getElementById('controlsSection');
-      const searchInput = document.getElementById('searchInput');
-      const resBox = document.getElementById('searchResults');
-
-      if (searchInput) searchInput.value = '';
-      if (resBox) { resBox.innerHTML = ''; resBox.style.display = 'none'; }
-      currentSearchResults = [];
-
-      if (tab === 'watchlist') {
-        searchSection.style.display = 'none';
-        controlsSection.style.display = 'block';
-      } else {
-        searchSection.style.display = 'block';
-        controlsSection.style.display = 'none';
-        searchInput.placeholder = `Search ${tab === 'tv' ? 'TV shows' : 'movies'} online...`;
-      }
-      appRender();
-    };
-
-    window.appSetFilter = function(filter) {
-      currentStatusFilter = filter;
-      const map = { all: 'pillAll', watching: 'pillWatching', to_watch: 'pillToWatch', favorites: 'pillFavorites', completed: 'pillCompleted' };
-      Object.keys(map).forEach(k => {
-        document.getElementById(map[k]).className = k === filter ? 'pill active' : 'pill';
-      });
-      appRender();
-    };
-
-    window.appToggleCompact = function() {
-      isCompactView = !isCompactView;
-      document.getElementById('viewToggleBtn').textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
-      appRender();
-    };
-
-    window.appToggleShow = function(id) {
-      expandedShows[id] = !expandedShows[id];
-      appRender();
-    };
-
-    window.appToggleSeason = function(showId, season) {
-      const key = `${showId}_${season}`;
-      expandedSeasons[key] = !expandedSeasons[key];
-      appRender();
-    };
-
-    window.appToggleEp = function(showId, epId) {
-      watchlist = watchlist.map(item => {
-        if (String(item.id) !== String(showId)) return item;
-        return {
-          ...item,
-          seasons: item.seasons.map(s => ({
-            ...s,
-            episodes: s.episodes.map(ep => String(ep.id) === String(epId) ? { ...ep, watched: !ep.watched } : ep)
-          }))
-        };
-      });
-      appSave();
-    };
-
-    window.appFavEp = function(showId, epId) {
-      watchlist = watchlist.map(item => {
-        if (String(item.id) !== String(showId)) return item;
-        return {
-          ...item,
-          seasons: item.seasons.map(s => ({
-            ...s,
-            episodes: s.episodes.map(ep => String(ep.id) === String(epId) ? { ...ep, favorite: !ep.favorite } : ep)
-          }))
-        };
-      });
-      appSave();
-    };
-
-    window.appBulkSeason = function(showId, season, markWatched) {
-      watchlist = watchlist.map(item => {
-        if (String(item.id) !== String(showId)) return item;
-        return {
-          ...item,
-          seasons: item.seasons.map(s => s.season !== season ? s : {
-            ...s,
-            episodes: s.episodes.map(ep => ({ ...ep, watched: markWatched }))
-          })
-        };
-      });
-      appSave();
-    };
-
-    window.appToggleMovie = function(id) {
-      watchlist = watchlist.map(item => String(item.id) === String(id) ? { ...item, watched: !item.watched } : item);
-      appSave();
-    };
-
-    window.appDelete = function(id) {
-      if (confirm('Remove this title from your list?')) {
-        watchlist = watchlist.filter(w => String(w.id) !== String(id));
-        appSave();
-      }
-    };
-
-    window.appExport = function() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
-      const a = document.createElement('a');
-      a.setAttribute("href", dataStr);
-      a.setAttribute("download", `watchlist_backup_${new Date().toISOString().slice(0,10)}.json`);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    };
-
-    window.appImport = function() {
-      const fileInput = document.getElementById('importFileInput');
-      fileInput.value = '';
-      fileInput.click();
-    };
-
-    document.getElementById('importFileInput').addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const raw = JSON.parse(evt.target.result);
-          if (Array.isArray(raw)) {
-            watchlist = normalizeWatchlist(raw);
-            appSave();
-            alert(`Loaded ${watchlist.length} items successfully!`);
-          } else {
-            alert('Invalid backup structure: expected a JSON array.');
-          }
-        } catch {
-          alert('Could not parse JSON file.');
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    // 5. Search Engine
-    window.appSearch = async function() {
-      const q = (document.getElementById('searchInput')?.value || '').trim();
-      if (!q) { appRender(); return; }
-
-      const resBox = document.getElementById('searchResults');
-      resBox.innerHTML = '<div style="padding:12px; color:#888;">Searching...</div>';
-      resBox.style.display = 'block';
-
-      try {
-        if (currentTab === 'tv') {
-          const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`);
-          const data = await res.json();
-          currentSearchResults = data.map(d => ({
-            id: String(d.show.id),
-            name: d.show.name,
-            type: 'tv'
-          }));
-          renderDropdown(currentSearchResults);
-        } else {
-          let titleQuery = q;
-          let yearQuery = '';
-          const yearMatch = q.match(/\b(19\d\d|20\d\d)\b/);
-          if (yearMatch) {
-            yearQuery = `&y=${yearMatch[0]}`;
-            titleQuery = q.replace(yearMatch[0], '').trim();
-          }
-
-          const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(titleQuery)}${yearQuery}&type=movie&apikey=${OMDB_KEY}`);
-          const data = await res.json();
-          if (data.Response === 'True') {
-            currentSearchResults = data.Search.map(m => ({
-              id: String(m.imdbID),
-              name: `${m.Title} (${m.Year})`,
-              rawTitle: m.Title,
-              type: 'movie'
+      function normalizeWatchlist(items) {
+        if (!Array.isArray(items)) return [];
+        return items.map(item => {
+          const norm = {
+            ...item,
+            id: String(item.id),
+            watched: item.watched === true,
+          };
+          if (norm.type === 'tv' && Array.isArray(norm.seasons)) {
+            norm.seasons = norm.seasons.map(s => ({
+              ...s,
+              episodes: (s.episodes || []).map(ep => ({
+                ...ep,
+                id: String(ep.id),
+                watched: ep.watched === true,
+                favorite: ep.favorite === true
+              }))
             }));
-            renderDropdown(currentSearchResults);
-          } else {
-            resBox.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
           }
-        }
-      } catch {
-        resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network.</div>';
-      }
-      appRender();
-    };
-
-    function renderDropdown(items) {
-      const box = document.getElementById('searchResults');
-      if (!items.length) {
-        box.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
-        return;
-      }
-      box.innerHTML = items.slice(0, 8).map((item, index) => `
-        <div class="drop-item" onclick="appAddByIndex(${index})">
-          <span>${escapeHtml(item.name)}</span>
-          <span style="color:#4ade80; font-weight:bold;">+ Add</span>
-        </div>
-      `).join('');
-    }
-
-    window.appAddByIndex = async function(index) {
-      const item = currentSearchResults[index];
-      if (!item) return;
-
-      if (watchlist.some(w => String(w.id) === String(item.id))) {
-        alert('Already in your list!');
-        return;
-      }
-
-      document.getElementById('searchResults').style.display = 'none';
-      document.getElementById('searchInput').value = '';
-
-      try {
-        if (item.type === 'movie') {
-          const res = await fetch(`https://www.omdbapi.com/?i=${item.id}&plot=short&apikey=${OMDB_KEY}`);
-          const d = await res.json();
-          watchlist.push({
-            id: String(item.id),
-            type: 'movie',
-            name: d.Title || item.rawTitle,
-            year: d.Year || '',
-            director: d.Director || 'N/A',
-            actors: d.Actors || 'N/A',
-            genres: d.Genre ? d.Genre.split(', ') : [],
-            image: d.Poster && d.Poster !== 'N/A' ? d.Poster : '',
-            watched: false
-          });
-        } else {
-          const epRes = await fetch(`https://api.tvmaze.com/shows/${item.id}/episodes`);
-          const rawEpisodes = await epRes.json();
-
-          const seasonsMap = {};
-          rawEpisodes.forEach(ep => {
-            const sNum = ep.season;
-            if (!seasonsMap[sNum]) seasonsMap[sNum] = { season: sNum, episodes: [] };
-            seasonsMap[sNum].episodes.push({
-              id: String(ep.id),
-              name: ep.name || `Episode ${ep.number}`,
-              number: ep.number,
-              season: ep.season,
-              watched: false,
-              favorite: false
-            });
-          });
-
-          watchlist.push({
-            id: String(item.id),
-            type: 'tv',
-            name: item.name,
-            image: rawEpisodes[0]?.image?.medium || '',
-            nextAirDate: 'TBD',
-            nextEpisodeTitle: '',
-            nextAirStamp: null,
-            seasons: Object.values(seasonsMap)
-          });
-        }
-
-        appSave();
-        appSwitchTab('watchlist');
-      } catch {
-        alert('Could not fetch details.');
-      }
-    };
-
-    // 6. View Rendering
-    function appRender() {
-      const container = document.getElementById('itemsContainer');
-      const heading = document.getElementById('listHeading');
-      if (!container || !heading) return;
-
-      let itemsToRender = [];
-
-      if (currentTab === 'watchlist') {
-        const filter = (document.getElementById('filterInput')?.value || '').toLowerCase().trim();
-        itemsToRender = watchlist.filter(item => {
-          if (currentStatusFilter === 'to_watch' && (item.type !== 'movie' || item.watched)) return false;
-          if (currentStatusFilter === 'watching') {
-            if (item.type !== 'tv') return false;
-            const stats = getStats(item.seasons);
-            if (stats.watched >= stats.total) return false;
-          }
-          if (currentStatusFilter === 'completed') {
-            if (item.type === 'movie' && !item.watched) return false;
-            if (item.type === 'tv') {
-              const stats = getStats(item.seasons);
-              if (stats.total === 0 || stats.watched < stats.total) return false;
-            }
-          }
-          if (currentStatusFilter === 'favorites') {
-            if (item.type === 'tv') {
-              const stats = getStats(item.seasons);
-              if (stats.favorites === 0) return false;
-            } else return false;
-          }
-
-          if (!filter) return true;
-          const matchName = item.name?.toLowerCase().includes(filter);
-          if (item.type === 'tv') return matchName;
-          return matchName ||
-                 item.director?.toLowerCase().includes(filter) ||
-                 item.actors?.toLowerCase().includes(filter) ||
-                 item.genres?.some(g => g.toLowerCase().includes(filter));
+          return norm;
         });
-
-        heading.style.display = 'block';
-        heading.textContent = `My Watchlist (${itemsToRender.length}${itemsToRender.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
-
-        if (!itemsToRender.length) {
-          container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No items found matching filter.</div>';
-          return;
-        }
-      } else {
-        const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
-        if (!searchQuery || searchQuery.length < 2) {
-          heading.style.display = 'none';
-          container.innerHTML = '';
-          return;
-        }
-
-        itemsToRender = watchlist.filter(item => item.type === currentTab && item.name.toLowerCase().includes(searchQuery));
-
-        if (!itemsToRender.length) {
-          heading.style.display = 'none';
-          container.innerHTML = '';
-          return;
-        }
-
-        heading.style.display = 'block';
-        heading.textContent = `Already in Watchlist (${itemsToRender.length})`;
       }
 
-      container.className = isCompactView ? 'compact-mode' : '';
+      // Safe storage retrieval
+      try {
+        const raw = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
+        watchlist = normalizeWatchlist(JSON.parse(raw));
+      } catch (e) {
+        watchlist = [];
+      }
 
-      container.innerHTML = itemsToRender.map(item => {
-        if (item.type === 'movie') {
+      function appSave() {
+        try {
+          localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
+        } catch (e) {}
+        appRender();
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      }
+
+      function getStats(seasons = []) {
+        let total = 0, watched = 0, favorites = 0;
+        seasons.forEach(s => (s.episodes || []).forEach(ep => {
+          total++;
+          if (ep.watched) watched++;
+          if (ep.favorite) favorites++;
+        }));
+        return { total, watched, favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
+      }
+
+      function appRender() {
+        const container = document.getElementById('itemsContainer');
+        const heading = document.getElementById('listHeading');
+        if (!container || !heading) return;
+
+        let itemsToRender = [];
+
+        if (currentTab === 'watchlist') {
+          const filter = (document.getElementById('filterInput')?.value || '').toLowerCase().trim();
+          itemsToRender = watchlist.filter(item => {
+            if (currentStatusFilter === 'to_watch' && (item.type !== 'movie' || item.watched)) return false;
+            if (currentStatusFilter === 'watching') {
+              if (item.type !== 'tv') return false;
+              const stats = getStats(item.seasons);
+              if (stats.watched >= stats.total) return false;
+            }
+            if (currentStatusFilter === 'completed') {
+              if (item.type === 'movie' && !item.watched) return false;
+              if (item.type === 'tv') {
+                const stats = getStats(item.seasons);
+                if (stats.total === 0 || stats.watched < stats.total) return false;
+              }
+            }
+            if (currentStatusFilter === 'favorites') {
+              if (item.type === 'tv') {
+                const stats = getStats(item.seasons);
+                if (stats.favorites === 0) return false;
+              } else return false;
+            }
+
+            if (!filter) return true;
+            const matchName = item.name?.toLowerCase().includes(filter);
+            if (item.type === 'tv') return matchName;
+            return matchName ||
+                   item.director?.toLowerCase().includes(filter) ||
+                   item.actors?.toLowerCase().includes(filter) ||
+                   item.genres?.some(g => g.toLowerCase().includes(filter));
+          });
+
+          heading.style.display = 'block';
+          heading.textContent = `My Watchlist (${itemsToRender.length}${itemsToRender.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
+
+          if (!itemsToRender.length) {
+            container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No items found matching filter.</div>';
+            return;
+          }
+        } else {
+          const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+          if (!searchQuery || searchQuery.length < 2) {
+            heading.style.display = 'none';
+            container.innerHTML = '';
+            return;
+          }
+
+          itemsToRender = watchlist.filter(item => item.type === currentTab && item.name.toLowerCase().includes(searchQuery));
+
+          if (!itemsToRender.length) {
+            heading.style.display = 'none';
+            container.innerHTML = '';
+            return;
+          }
+
+          heading.style.display = 'block';
+          heading.textContent = `Already in Watchlist (${itemsToRender.length})`;
+        }
+
+        container.className = isCompactView ? 'compact-mode' : '';
+
+        container.innerHTML = itemsToRender.map(item => {
+          if (item.type === 'movie') {
+            return `
+              <div class="card-container">
+                <div class="card-main">
+                  ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
+                  <div class="info">
+                    <div class="title">${escapeHtml(item.name)} <span style="color:#888; font-size:12px;">(${escapeHtml(item.year)})</span></div>
+                    <div class="tags">
+                      ${(item.genres || []).map(g => `<span class="tag">${escapeHtml(g)}</span>`).join('')}
+                    </div>
+                    <div class="sub">Dir: ${escapeHtml(item.director)}</div>
+                    <div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ${escapeHtml(item.actors)}</div>
+                    <button type="button" class="btn-action ${item.watched ? 'btn-watched' : ''}" data-act="toggle-movie" data-id="${item.id}">
+                      ${item.watched ? '✓ Watched' : '○ Mark as Watched'}
+                    </button>
+                  </div>
+                  <button type="button" class="delete-btn" data-act="delete" data-id="${item.id}">✕</button>
+                </div>
+              </div>
+            `;
+          }
+
+          const stats = getStats(item.seasons);
+          const isShowExpanded = !!expandedShows[item.id];
+
+          let calLink = '';
+          if (item.nextAirStamp) {
+            const d = new Date(item.nextAirStamp);
+            const iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            calLink = `<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('New ' + item.name + ' Episode')}&dates=${iso}/${iso}&details=${encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>`;
+          }
+
+          let episodesHtml = '';
+          if (isShowExpanded && item.seasons) {
+            episodesHtml = `
+              <div class="episodes-panel">
+                ${item.seasons.map((s, idx) => {
+                  const sTotal = s.episodes.length;
+                  const sWatched = s.episodes.filter(ep => ep.watched).length;
+                  const allWatched = sTotal > 0 && sWatched === sTotal;
+                  
+                  const key = `${item.id}_${s.season}`;
+                  if (expandedSeasons[key] === undefined) {
+                    expandedSeasons[key] = (sWatched < sTotal) && (idx === 0 || (item.seasons[idx - 1] && item.seasons[idx - 1].episodes.every(e => e.watched)));
+                  }
+                  const isSeasonOpen = !!expandedSeasons[key];
+
+                  return `
+                    <div class="season-block">
+                      <div class="season-header" data-act="toggle-season" data-show="${item.id}" data-season="${s.season}">
+                        <div class="season-title-group" style="pointer-events:none;">
+                          <span class="season-indicator">${isSeasonOpen ? '▼' : '▶'}</span>
+                          <span class="season-title">Season ${s.season}</span>
+                          <span class="season-stats">(${sWatched}/${sTotal})</span>
+                        </div>
+                        <button type="button" class="bulk-btn" data-act="bulk-season" data-show="${item.id}" data-season="${s.season}" data-mark="${!allWatched}">
+                          ${allWatched ? 'Unmark Season' : 'Watch Season'}
+                        </button>
+                      </div>
+                      ${isSeasonOpen ? `
+                        <div class="season-episodes-list">
+                          ${s.episodes.map(ep => `
+                            <div class="episode-row">
+                              <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" data-act="toggle-ep" data-show="${item.id}" data-ep="${ep.id}">
+                                ${ep.watched ? '✓' : '○'}
+                              </span>
+                              <span class="episode-label ${ep.watched ? 'watched' : ''}" data-act="toggle-ep" data-show="${item.id}" data-ep="${ep.id}">
+                                E${ep.number \vert{}\vert{} '-'}:${escapeHtml(ep.name)}
+                              </span>
+                              <button type="button" class="star-btn ${ep.favorite ? 'active' : ''}" data-act="fav-ep" data-show="${item.id}" data-ep="${ep.id}">
+                                ${ep.favorite ? '★' : '☆'}
+                              </button>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }
+
           return `
             <div class="card-container">
               <div class="card-main">
                 ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
                 <div class="info">
-                  <div class="title">${escapeHtml(item.name)} <span style="color:#888; font-size:12px;">(${escapeHtml(item.year)})</span></div>
-                  <div class="tags">
-                    ${(item.genres || []).map(g => `<span class="tag">${escapeHtml(g)}</span>`).join('')}
+                  <div class="title">${escapeHtml(item.name)}</div>
+                  <div class="sub" style="color:#38bdf8;">Next Air: ${escapeHtml(item.nextAirDate)}</div>
+                  <div class="progress-text">
+                    ${stats.watched} / ${stats.total} eps (${stats.pct}%) 
+                    ${stats.favorites > 0 ? `· <span style="color:#facc15;">★ ${stats.favorites}</span>` : ''}
                   </div>
-                  <div class="sub">Dir: ${escapeHtml(item.director)}</div>
-                  <div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ${escapeHtml(item.actors)}</div>
-                  <button type="button" class="btn-action ${item.watched ? 'btn-watched' : ''}" onclick="appToggleMovie('${item.id}')">
-                    ${item.watched ? '✓ Watched' : '○ Mark as Watched'}
+                  <button type="button" class="btn-expand" data-act="toggle-show" data-id="${item.id}">
+                    ${isShowExpanded ? '▲ Hide Episodes' : '▼ View Episodes'}
                   </button>
+                  ${calLink}
                 </div>
-                <button type="button" class="delete-btn" onclick="appDelete('${item.id}')">✕</button>
+                <button type="button" class="delete-btn" data-act="delete" data-id="${item.id}">✕</button>
               </div>
+              ${episodesHtml}
             </div>
           `;
+        }).join('');
+      }
+
+      // Root click handler
+      document.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-act]');
+        if (!target) return;
+
+        const act = target.getAttribute('data-act');
+
+        if (act === 'toggle-show') {
+          const id = target.getAttribute('data-id');
+          expandedShows[id] = !expandedShows[id];
+          appRender();
         }
-
-        const stats = getStats(item.seasons);
-        const isShowExpanded = !!expandedShows[item.id];
-
-        let calLink = '';
-        if (item.nextAirStamp) {
-          const d = new Date(item.nextAirStamp);
-          const iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-          calLink = `<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('New ' + item.name + ' Episode')}&dates=${iso}/${iso}&details=${encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>`;
+        else if (act === 'toggle-season') {
+          if (e.target.closest('.bulk-btn')) return;
+          const showId = target.getAttribute('data-show');
+          const season = target.getAttribute('data-season');
+          const key = `${showId}_${season}`;
+          expandedSeasons[key] = !expandedSeasons[key];
+          appRender();
         }
-
-        let episodesHtml = '';
-        if (isShowExpanded && item.seasons) {
-          episodesHtml = `
-            <div class="episodes-panel">
-              ${item.seasons.map((s, idx) => {
-                const sTotal = s.episodes.length;
-                const sWatched = s.episodes.filter(ep => ep.watched).length;
-                const allWatched = sTotal > 0 && sWatched === sTotal;
-                
-                const key = `${item.id}_${s.season}`;
-                if (expandedSeasons[key] === undefined) {
-                  expandedSeasons[key] = (sWatched < sTotal) && (idx === 0 || (item.seasons[idx - 1] && item.seasons[idx - 1].episodes.every(e => e.watched)));
-                }
-                const isSeasonOpen = !!expandedSeasons[key];
-
-                return `
-                  <div class="season-block">
-                    <div class="season-header">
-                      <div class="season-title-group" onclick="appToggleSeason('${item.id}',${s.season})">
-                        <span class="season-indicator">${isSeasonOpen ? '▼' : '▶'}</span>
-                        <span class="season-title">Season ${s.season}</span>
-                        <span class="season-stats">(${sWatched}/${sTotal})</span>
-                      </div>
-                      <button type="button" class="bulk-btn" onclick="appBulkSeason('${item.id}', ${s.season},${!allWatched})">
-                        ${allWatched ? 'Unmark Season' : 'Watch Season'}
-                      </button>
-                    </div>
-                    ${isSeasonOpen ? `
-                      <div class="season-episodes-list">
-                        ${s.episodes.map(ep => `
-                          <div class="episode-row">
-                            <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="appToggleEp('${item.id}', '${ep.id}')">
-                              ${ep.watched ? '✓' : '○'}
-                            </span>
-                            <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="appToggleEp('${item.id}', '${ep.id}')">
-                              E${ep.number \vert{}\vert{} '-'}:${escapeHtml(ep.name)}
-                            </span>
-                            <button type="button" class="star-btn ${ep.favorite ? 'active' : ''}" onclick="appFavEp('${item.id}', '${ep.id}')">
-                              ${ep.favorite ? '★' : '☆'}
-                            </button>
-                          </div>
-                        `).join('')}
-                      </div>
-                    ` : ''}
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          `;
+        else if (act === 'toggle-ep') {
+          const showId = target.getAttribute('data-show');
+          const epId = target.getAttribute('data-ep');
+          watchlist = watchlist.map(item => {
+            if (String(item.id) !== String(showId)) return item;
+            return {
+              ...item,
+              seasons: (item.seasons || []).map(s => ({
+                ...s,
+                episodes: (s.episodes || []).map(ep => String(ep.id) === String(epId) ? { ...ep, watched: !ep.watched } : ep)
+              }))
+            };
+          });
+          appSave();
         }
+        else if (act === 'fav-ep') {
+          const showId = target.getAttribute('data-show');
+          const epId = target.getAttribute('data-ep');
+          watchlist = watchlist.map(item => {
+            if (String(item.id) !== String(showId)) return item;
+            return {
+              ...item,
+              seasons: (item.seasons || []).map(s => ({
+                ...s,
+                episodes: (s.episodes || []).map(ep => String(ep.id) === String(epId) ? { ...ep, favorite: !ep.favorite } : ep)
+              }))
+            };
+          });
+          appSave();
+        }
+        else if (act === 'bulk-season') {
+          const showId = target.getAttribute('data-show');
+          const season = Number(target.getAttribute('data-season'));
+          const markWatched = target.getAttribute('data-mark') === 'true';
+          watchlist = watchlist.map(item => {
+            if (String(item.id) !== String(showId)) return item;
+            return {
+              ...item,
+              seasons: (item.seasons || []).map(s => s.season !== season ? s : {
+                ...s,
+                episodes: (s.episodes || []).map(ep => ({ ...ep, watched: markWatched }))
+              })
+            };
+          });
+          appSave();
+        }
+        else if (act === 'toggle-movie') {
+          const id = target.getAttribute('data-id');
+          watchlist = watchlist.map(item => String(item.id) === String(id) ? { ...item, watched: !item.watched } : item);
+          appSave();
+        }
+        else if (act === 'delete') {
+          const id = target.getAttribute('data-id');
+          if (confirm('Remove this title from your list?')) {
+            watchlist = watchlist.filter(w => String(w.id) !== String(id));
+            appSave();
+          }
+        }
+        else if (act === 'add-result') {
+          const index = Number(target.getAttribute('data-idx'));
+          addByIndex(index);
+        }
+      });
 
-        return `
-          <div class="card-container">
-            <div class="card-main">
-              ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
-              <div class="info">
-                <div class="title">${escapeHtml(item.name)}</div>
-                <div class="sub" style="color:#38bdf8;">Next Air: ${escapeHtml(item.nextAirDate)}</div>
-                <div class="progress-text">
-                  ${stats.watched} / ${stats.total} eps (${stats.pct}%) 
-                  ${stats.favorites > 0 ? `· <span style="color:#facc15;">★ ${stats.favorites}</span>` : ''}
-                </div>
-                <button type="button" class="btn-expand" onclick="appToggleShow('${item.id}')">
-                  ${isShowExpanded ? '▲ Hide Episodes' : '▼ View Episodes'}
-                </button>
-                ${calLink}
-              </div>
-              <button type="button" class="delete-btn" onclick="appDelete('${item.id}')">✕</button>
-            </div>
-            ${episodesHtml}
+      // Tabs
+      document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentTab = btn.getAttribute('data-tab');
+          document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          const searchSection = document.getElementById('searchSection');
+          const controlsSection = document.getElementById('controlsSection');
+          const searchInput = document.getElementById('searchInput');
+          const resBox = document.getElementById('searchResults');
+
+          if (searchInput) searchInput.value = '';
+          if (resBox) { resBox.innerHTML = ''; resBox.style.display = 'none'; }
+          currentSearchResults = [];
+
+          if (currentTab === 'watchlist') {
+            searchSection.style.display = 'none';
+            controlsSection.style.display = 'block';
+          } else {
+            searchSection.style.display = 'block';
+            controlsSection.style.display = 'none';
+            searchInput.placeholder = `Search ${currentTab === 'tv' ? 'TV shows' : 'movies'} online...`;
+            searchInput.focus();
+          }
+          appRender();
+        });
+      });
+
+      // Filter pills
+      document.querySelectorAll('.status-pills .pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentStatusFilter = btn.getAttribute('data-filter');
+          document.querySelectorAll('.status-pills .pill').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          appRender();
+        });
+      });
+
+      // Compact toggle
+      document.getElementById('viewToggleBtn').addEventListener('click', () => {
+        isCompactView = !isCompactView;
+        document.getElementById('viewToggleBtn').textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
+        appRender();
+      });
+
+      document.getElementById('filterInput').addEventListener('input', appRender);
+
+      // Export
+      document.getElementById('btnExport').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
+        const a = document.createElement('a');
+        a.setAttribute("href", dataStr);
+        a.setAttribute("download", `watchlist_backup_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+
+      // Import
+      document.getElementById('btnImport').addEventListener('click', () => {
+        const fileInput = document.getElementById('importFileInput');
+        fileInput.value = '';
+        fileInput.click();
+      });
+
+      document.getElementById('importFileInput').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const raw = JSON.parse(evt.target.result);
+            if (Array.isArray(raw)) {
+              watchlist = normalizeWatchlist(raw);
+              appSave();
+              alert(`Watchlist restored! Loaded ${watchlist.length} items.`);
+            } else {
+              alert('Invalid backup file: expected a JSON array.');
+            }
+          } catch {
+            alert('Could not parse JSON file.');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Search Online
+      document.getElementById('btnSearch').addEventListener('click', executeSearch);
+      document.getElementById('searchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') executeSearch();
+      });
+
+      async function executeSearch() {
+        const q = (document.getElementById('searchInput')?.value || '').trim();
+        if (!q) { appRender(); return; }
+
+        const resBox = document.getElementById('searchResults');
+        resBox.innerHTML = '<div style="padding:12px; color:#888;">Searching...</div>';
+        resBox.style.display = 'block';
+
+        try {
+          if (currentTab === 'tv') {
+            const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            currentSearchResults = data.map(d => ({
+              id: String(d.show.id),
+              name: d.show.name,
+              type: 'tv'
+            }));
+            renderDropdown(currentSearchResults);
+          } else {
+            let titleQuery = q;
+            let yearQuery = '';
+            const yearMatch = q.match(/\b(19\d\d|20\d\d)\b/);
+            if (yearMatch) {
+              yearQuery = `&y=${yearMatch[0]}`;
+              titleQuery = q.replace(yearMatch[0], '').trim();
+            }
+
+            const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(titleQuery)}${yearQuery}&type=movie&apikey=${OMDB_KEY}`);
+            const data = await res.json();
+            if (data.Response === 'True') {
+              currentSearchResults = data.Search.map(m => ({
+                id: String(m.imdbID),
+                name: `${m.Title} (${m.Year})`,
+                rawTitle: m.Title,
+                type: 'movie'
+              }));
+              renderDropdown(currentSearchResults);
+            } else {
+              resBox.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
+            }
+          }
+        } catch {
+          resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network.</div>';
+        }
+        appRender();
+      }
+
+      function renderDropdown(items) {
+        const box = document.getElementById('searchResults');
+        if (!items.length) {
+          box.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
+          return;
+        }
+        box.innerHTML = items.slice(0, 8).map((item, index) => `
+          <div class="drop-item" data-act="add-result" data-idx="${index}">
+            <span>${escapeHtml(item.name)}</span>
+            <span style="color:#4ade80; font-weight:bold;">+ Add</span>
           </div>
-        `;
-      }).join('');
-    }
+        `).join('');
+      }
 
-    appRender();
+      async function addByIndex(index) {
+        const item = currentSearchResults[index];
+        if (!item) return;
+
+        if (watchlist.some(w => String(w.id) === String(item.id))) {
+          alert('Already in your list!');
+          return;
+        }
+
+        document.getElementById('searchResults').style.display = 'none';
+        document.getElementById('searchInput').value = '';
+
+        try {
+          if (item.type === 'movie') {
+            const res = await fetch(`https://www.omdbapi.com/?i=${item.id}&plot=short&apikey=${OMDB_KEY}`);
+            const d = await res.json();
+            watchlist.push({
+              id: String(item.id),
+              type: 'movie',
+              name: d.Title || item.rawTitle,
+              year: d.Year || '',
+              director: d.Director || 'N/A',
+              actors: d.Actors || 'N/A',
+              genres: d.Genre ? d.Genre.split(', ') : [],
+              image: d.Poster && d.Poster !== 'N/A' ? d.Poster : '',
+              watched: false
+            });
+          } else {
+            const epRes = await fetch(`https://api.tvmaze.com/shows/${item.id}/episodes`);
+            const rawEpisodes = await epRes.json();
+
+            const seasonsMap = {};
+            rawEpisodes.forEach(ep => {
+              const sNum = ep.season;
+              if (!seasonsMap[sNum]) seasonsMap[sNum] = { season: sNum, episodes: [] };
+              seasonsMap[sNum].episodes.push({
+                id: String(ep.id),
+                name: ep.name || `Episode ${ep.number}`,
+                number: ep.number,
+                season: ep.season,
+                watched: false,
+                favorite: false
+              });
+            });
+
+            watchlist.push({
+              id: String(item.id),
+              type: 'tv',
+              name: item.name,
+              image: rawEpisodes[0]?.image?.medium || '',
+              nextAirDate: 'TBD',
+              nextEpisodeTitle: '',
+              nextAirStamp: null,
+              seasons: Object.values(seasonsMap)
+            });
+          }
+
+          appSave();
+          document.querySelector('[data-tab="watchlist"]').click();
+        } catch {
+          alert('Could not fetch details.');
+        }
+      }
+
+      // Initial render
+      appRender();
+    })();
   </script>
 </body>
 </html>
