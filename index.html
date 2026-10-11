@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrackMyWatchlist</title>
+  <title>TrackList</title>
   <meta name="theme-color" content="#121212">
   <link rel="manifest" href="./manifest.json">
   <style>
@@ -14,56 +14,62 @@
     .tab { flex: 1; padding: 8px; text-align: center; background: none; border: none; color: #888; font-weight: bold; cursor: pointer; border-radius: 6px; }
     .tab.active { background: #333; color: #fff; }
     .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
-    input[type="text"] { flex: 1; padding: 10px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; }
+    input[type="text"] { flex: 1; padding: 10px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 14px; }
+    input[type="text"]:focus { outline: none; border-color: #555; }
     button.btn-search { background: #e50914; color: #fff; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
     .dropdown { background: #222; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
     .drop-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #333; cursor: pointer; align-items: center; }
+    .drop-item:active { background: #2a2a2a; }
     .card { background: #1e1e1e; border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; }
-    .poster { width: 55px; height: 80px; object-fit: cover; border-radius: 4px; }
+    .poster { width: 55px; height: 80px; object-fit: cover; border-radius: 4px; background: #2a2a2a; }
     .info { flex: 1; }
     .title { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
     .sub { color: #888; font-size: 12px; margin-bottom: 6px; }
     .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-    .tag { background: #2a2a2a; color: #38bdf8; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-    .btn-action { background: #262626; border: none; color: #aaa; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .tag { background: #2a2a2a; color: #38bdf8; font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+    .btn-action { background: #262626; border: none; color: #aaa; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 500; }
     .btn-watched { background: #14532d; color: #4ade80; }
-    .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 3px 6px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 4px; }
-    .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; height: fit-content; }
-    .filter-box { background: #1a1a1a; padding: 8px; border-radius: 8px; margin-bottom: 12px; }
+    .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 4px; }
+    .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; height: fit-content; padding: 4px 8px; }
+    .filter-box { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 14px; }
+    .backup-row { display: flex; gap: 8px; margin-top: 24px; padding-top: 14px; border-top: 1px solid #262626; }
   </style>
 </head>
 <body>
 
   <h1>TrackList</h1>
-  <div style="display:flex; gap:8px; margin-top:16px;">
-  <button class="btn-action" onclick="exportBackup()">📥 Export Backup</button>
-  <label class="btn-action" style="cursor:pointer;">
-      📤 Import Backup
-      <input type="file" accept=".json" onchange="importBackup(event)" style="display:none;">
-    </label>
-  </div>
+  
   <div class="tabs">
     <button class="tab active" id="tab-tv" onclick="switchMedia('tv')">TV Shows</button>
     <button class="tab" id="tab-movie" onclick="switchMedia('movie')">Movies</button>
   </div>
 
   <div class="search-row">
-    <input type="text" id="searchInput" placeholder="Search TV shows online...">
+    <input type="text" id="searchInput" placeholder="Search TV shows online..." onkeydown="if(event.key==='Enter') searchOnline()">
     <button class="btn-search" onclick="searchOnline()">Search</button>
   </div>
 
   <div id="searchResults" class="dropdown" style="display:none;"></div>
 
   <div class="filter-box">
-    <input type="text" id="filterInput" placeholder="Filter saved movies by genre/director/actor..." oninput="renderWatchlist()">
+    <input type="text" id="filterInput" placeholder="Filter saved items by name, genre, director, actor..." oninput="renderWatchlist()">
   </div>
 
-  <h3 style="color:#aaa; font-size:14px; margin-bottom:8px;">My Saved Items</h3>
+  <h3 id="listHeading" style="color:#aaa; font-size:14px; margin-bottom:8px;">My Saved Items</h3>
   <div id="watchlistContainer"></div>
 
+  <div class="backup-row">
+    <button class="btn-action" onclick="exportBackup()">📥 Export Backup</button>
+    <label class="btn-action" style="cursor:pointer; display:inline-flex; align-items:center;">
+      📤 Import Backup
+      <input type="file" accept=".json" onchange="importBackup(event)" style="display:none;">
+    </label>
+  </div>
+
   <script>
-    const OMDB_API_KEY = "9f85df42"; // Insert OMDb key if testing movies
+    const OMDB_API_KEY = "9f85df42"; // Replace with your OMDb API key
     let currentType = 'tv';
+    let currentSearchResults = [];
     let watchlist = JSON.parse(localStorage.getItem('tracklist_items') || '[]');
 
     function save() {
@@ -71,108 +77,185 @@
       renderWatchlist();
     }
 
+    // Switches tabs and clears out search queries and dropdown items
     function switchMedia(type) {
       currentType = type;
+      
+      // Update Tab styling
       document.getElementById('tab-tv').className = type === 'tv' ? 'tab active' : 'tab';
       document.getElementById('tab-movie').className = type === 'movie' ? 'tab active' : 'tab';
-      document.getElementById('searchInput').placeholder = `Search ${type === 'tv' ? 'TV shows' : 'movies'} online...`;
-      document.getElementById('searchResults').style.display = 'none';
+
+      // Clear search box and drop-down state
+      const searchInput = document.getElementById('searchInput');
+      searchInput.value = '';
+      searchInput.placeholder = `Search ${type === 'tv' ? 'TV shows' : 'movies'} online...`;
+      
+      const resBox = document.getElementById('searchResults');
+      resBox.innerHTML = '';
+      resBox.style.display = 'none';
+      currentSearchResults = [];
     }
 
     async function searchOnline() {
       const q = document.getElementById('searchInput').value.trim();
       if (!q) return;
       const resBox = document.getElementById('searchResults');
-      resBox.innerHTML = '<div style="padding:10px; color:#888;">Searching...</div>';
+      resBox.innerHTML = '<div style="padding:12px; color:#888;">Searching...</div>';
       resBox.style.display = 'block';
 
-      if (currentType === 'tv') {
-        const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        renderDropdown(data.map(d => ({ id: d.show.id, name: d.show.name, type: 'tv' })));
-      } else {
-        const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
-        const data = await res.json();
-        if (data.Response === 'True') {
-          renderDropdown(data.Search.map(m => ({ id: m.imdbID, name: `${m.Title} (${m.Year})`, rawTitle: m.Title, type: 'movie' })));
+      try {
+        if (currentType === 'tv') {
+          const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          currentSearchResults = data.map(d => ({
+            id: String(d.show.id),
+            name: d.show.name,
+            type: 'tv'
+          }));
+          renderDropdown(currentSearchResults);
         } else {
-          resBox.innerHTML = '<div style="padding:10px; color:#888;">No results found.</div>';
+          const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
+          const data = await res.json();
+          if (data.Response === 'True') {
+            currentSearchResults = data.Search.map(m => ({
+              id: String(m.imdbID),
+              name: `${m.Title} (${m.Year})`,
+              rawTitle: m.Title,
+              type: 'movie'
+            }));
+            renderDropdown(currentSearchResults);
+          } else {
+            // Fallback for specific movie titles
+            const exactRes = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
+            const exactData = await exactRes.json();
+            if (exactData.Response === 'True') {
+              currentSearchResults = [{
+                id: String(exactData.imdbID),
+                name: `${exactData.Title} (${exactData.Year})`,
+                rawTitle: exactData.Title,
+                type: 'movie'
+              }];
+              renderDropdown(currentSearchResults);
+            } else {
+              resBox.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
+            }
+          }
         }
+      } catch (err) {
+        console.error(err);
+        resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network or API key.</div>';
       }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     }
 
     function renderDropdown(items) {
       const box = document.getElementById('searchResults');
-      box.innerHTML = items.slice(0, 5).map(item => `
-        <div class="drop-item" onclick='addItem(${JSON.stringify(item)})'>
-          <span>${item.name}</span>
+      if (!items.length) {
+        box.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
+        return;
+      }
+
+      box.innerHTML = items.slice(0, 8).map((item, index) => `
+        <div class="drop-item" onclick="addItemByIndex(${index})">
+          <span>${escapeHtml(item.name)}</span>
           <span style="color:#4ade80; font-weight:bold;">+ Add</span>
         </div>
       `).join('');
     }
 
-    async function addItem(item) {
-      if (watchlist.some(w => w.id === item.id)) return alert('Already in list');
+    async function addItemByIndex(index) {
+      const item = currentSearchResults[index];
+      if (!item) return;
+
+      if (watchlist.some(w => String(w.id) === String(item.id))) {
+        alert('Already in your list!');
+        return;
+      }
+
       document.getElementById('searchResults').style.display = 'none';
       document.getElementById('searchInput').value = '';
 
-      if (item.type === 'movie') {
-        const res = await fetch(`https://www.omdbapi.com/?i=${item.id}&plot=short&apikey=${OMDB_API_KEY}`);
-        const d = await res.json();
-        watchlist.push({
-          id: item.id,
-          type: 'movie',
-          name: d.Title,
-          year: d.Year,
-          director: d.Director,
-          actors: d.Actors,
-          genres: d.Genre ? d.Genre.split(', ') : [],
-          image: d.Poster !== 'N/A' ? d.Poster : '',
-          watched: false
-        });
-      } else {
-        // TV Show details and next air date
-        const res = await fetch(`https://api.tvmaze.com/shows/${item.id}?embed=nextepisode`);
-        const d = await res.json();
-        const nextEp = d._embedded?.nextepisode;
-        watchlist.push({
-          id: item.id,
-          type: 'tv',
-          name: d.name,
-          image: d.image?.medium || '',
-          nextAirDate: nextEp ? nextEp.airdate : 'TBD',
-          nextEpisodeTitle: nextEp ? nextEp.name : '',
-          nextAirStamp: nextEp ? nextEp.airstamp : null
-        });
+      try {
+        if (item.type === 'movie') {
+          const res = await fetch(`https://www.omdbapi.com/?i=${item.id}&plot=short&apikey=${OMDB_API_KEY}`);
+          const d = await res.json();
+          watchlist.push({
+            id: String(item.id),
+            type: 'movie',
+            name: d.Title || item.rawTitle,
+            year: d.Year || '',
+            director: d.Director || 'N/A',
+            actors: d.Actors || 'N/A',
+            genres: d.Genre ? d.Genre.split(', ') : [],
+            image: d.Poster && d.Poster !== 'N/A' ? d.Poster : '',
+            watched: false
+          });
+        } else {
+          const res = await fetch(`https://api.tvmaze.com/shows/${item.id}?embed=nextepisode`);
+          const d = await res.json();
+          const nextEp = d._embedded?.nextepisode;
+
+          watchlist.push({
+            id: String(item.id),
+            type: 'tv',
+            name: d.name || item.name,
+            image: d.image?.medium || '',
+            nextAirDate: nextEp ? nextEp.airdate : 'TBD',
+            nextEpisodeTitle: nextEp ? nextEp.name : '',
+            nextAirStamp: nextEp ? nextEp.airstamp : null
+          });
+        }
+
+        save();
+      } catch (err) {
+        console.error('Failed to import item:', err);
+        alert('Could not fetch details. Please try again.');
       }
-      save();
     }
 
     function toggleWatched(id) {
-      watchlist = watchlist.map(item => item.id === id ? { ...item, watched: !item.watched } : item);
+      watchlist = watchlist.map(item => String(item.id) === String(id) ? { ...item, watched: !item.watched } : item);
       save();
     }
 
     function deleteItem(id) {
-      watchlist = watchlist.filter(w => w.id !== id);
+      watchlist = watchlist.filter(w => String(w.id) !== String(id));
       save();
+    }
+
+    function setFilterTag(genre) {
+      document.getElementById('filterInput').value = genre;
+      renderWatchlist();
     }
 
     function renderWatchlist() {
       const filter = document.getElementById('filterInput').value.toLowerCase().trim();
       const container = document.getElementById('watchlistContainer');
+      const heading = document.getElementById('listHeading');
       
       const filtered = watchlist.filter(item => {
         if (!filter) return true;
-        if (item.type === 'tv') return item.name.toLowerCase().includes(filter);
-        return item.name.toLowerCase().includes(filter) ||
+        const matchName = item.name?.toLowerCase().includes(filter);
+        if (item.type === 'tv') return matchName;
+        return matchName ||
                item.director?.toLowerCase().includes(filter) ||
                item.actors?.toLowerCase().includes(filter) ||
                item.genres?.some(g => g.toLowerCase().includes(filter));
       });
 
+      heading.textContent = `My Saved Items (${filtered.length}${filtered.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
+
       if (!filtered.length) {
-        container.innerHTML = '<div style="color:#666; font-size:13px;">No items match.</div>';
+        container.innerHTML = '<div style="color:#666; font-size:13px; padding:10px 0;">No items found.</div>';
         return;
       }
 
@@ -180,21 +263,22 @@
         if (item.type === 'movie') {
           return `
             <div class="card">
-              ${item.image ? `<img src="${item.image}" class="poster">` : ''}
+              ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
               <div class="info">
-                <div class="title">${item.name} (${item.year})</div>
-                <div class="tags">${item.genres.map(g => `<span class="tag">${g}</span>`).join('')}</div>
-                <div class="sub">Dir: ${item.director}</div>
-                <div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ${item.actors}</div>
+                <div class="title">${escapeHtml(item.name)} <span style="color:#888; font-size:12px;">(${escapeHtml(item.year)})</span></div>
+                <div class="tags">
+                  ${(item.genres || []).map(g => `<span class="tag" onclick="setFilterTag('${escapeHtml(g)}')">${escapeHtml(g)}</span>`).join('')}
+                </div>
+                <div class="sub">Dir: ${escapeHtml(item.director)}</div>
+                <div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;">Cast: ${escapeHtml(item.actors)}</div>
                 <button class="btn-action ${item.watched ? 'btn-watched' : ''}" onclick="toggleWatched('${item.id}')">
-                  ${item.watched ? '✓ Watched' : '○ Mark Watched'}
+                  ${item.watched ? '✓ Watched' : '○ Mark as Watched'}
                 </button>
               </div>
               <button class="delete-btn" onclick="deleteItem('${item.id}')">✕</button>
             </div>
           `;
         } else {
-          // Generate Google Calendar alert link for TV episode airdate
           let calLink = '';
           if (item.nextAirStamp) {
             const d = new Date(item.nextAirStamp);
@@ -204,10 +288,10 @@
 
           return `
             <div class="card">
-              ${item.image ? `<img src="${item.image}" class="poster">` : ''}
+              ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
               <div class="info">
-                <div class="title">${item.name}</div>
-                <div class="sub" style="color:#38bdf8;">Next Air Date: ${item.nextAirDate}</div>
+                <div class="title">${escapeHtml(item.name)}</div>
+                <div class="sub" style="color:#38bdf8;">Next Air Date: ${escapeHtml(item.nextAirDate)}</div>
                 ${calLink}
               </div>
               <button class="delete-btn" onclick="deleteItem('${item.id}')">✕</button>
@@ -217,16 +301,6 @@
       }).join('');
     }
 
-    // Register basic service worker to enable "Install as App" on Android Chrome
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('SW Registered!', reg))
-        .catch(err => console.error('SW Error:', err));
-        });
-    }
-
-    // Export Watchlist as a .json file to your phone
     function exportBackup() {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -236,25 +310,35 @@
       downloadAnchor.click();
       downloadAnchor.remove();
     }
-    
-    // Restore Watchlist from a chosen .json file
+
     function importBackup(event) {
       const fileReader = new FileReader();
       fileReader.onload = function(e) {
         try {
-          const importedData = JSON.parse(e.target.result);
-          if (Array.isArray(importedData)) {
-            watchlist = importedData;
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported)) {
+            watchlist = imported;
             save();
             alert('Watchlist restored successfully!');
           } else {
-            alert('Invalid backup format.');
+            alert('Invalid backup structure.');
           }
-        } catch (err) {
-          alert('Error parsing backup file.');
+        } catch {
+          alert('Could not parse JSON file.');
         }
       };
-      fileReader.readAsText(event.target.files[0]);
+      if (event.target.files && event.target.files[0]) {
+        fileReader.readAsText(event.target.files[0]);
+      }
+    }
+
+    // Register Service Worker for PWA compliance
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW Registered', reg))
+          .catch(err => console.error('SW Error', err));
+      });
     }
 
     renderWatchlist();
