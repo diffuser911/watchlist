@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>TrackMyWatchList</title>
   <meta name="theme-color" content="#121212">
+  <link rel="manifest" href="./manifest.json">
+  <script src="./config.js"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -400,7 +402,7 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyWatchList</h1>
-      <span class="version-badge">v3.5</span>
+      <span class="version-badge">v3.6</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" id="btnExport">📥 Export</button>
@@ -440,25 +442,20 @@
   <h3 id="listHeading" style="color:#aaa; font-size:13px; margin-bottom:8px;">Saved Items</h3>
   <div id="itemsContainer"></div>
 
-  <script src="./config.js"></script>
   <script>
-    // 1. Purge obsolete service workers & browser cache
+    // 1. Service Worker Registration (Required for PWA Install)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        for (var i = 0; i < regs.length; i++) regs[i].unregister();
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(keys) {
-        keys.forEach(function(k) { caches.delete(k); });
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').then(function(reg) {
+          reg.update();
+        }).catch(function(err) {
+          console.warn('SW registration failed:', err);
+        });
       });
     }
 
     // 2. Safe API Key Resolution
     var OMDB_KEY = (typeof OMDB_API_KEY !== 'undefined') ? OMDB_API_KEY : "YOUR_OMDB_KEY";
-    try {
-      if (typeof OMDB_API_KEY !== 'undefined') OMDB_KEY = OMDB_API_KEY;
-    } catch (e) {}
 
     // 3. Application State
     var currentTab = 'watchlist';
@@ -665,13 +662,12 @@
               }
               var allWatched = sTotal > 0 && sWatched === sTotal;
 
-              // Display Year logic: use saved year or parse from first episode
               var sYear = s.year || (s.episodes[0] && s.episodes[0].airdate ? s.episodes[0].airdate.slice(0, 4) : '');
               var yearLabel = sYear ? ' <span style="color:#888; font-size:12px; font-weight:normal;">(' + escapeHtml(sYear) + ')</span>' : '';
 
               var key = item.id + '_' + s.season;
               if (expandedSeasons[key] === undefined) {
-                expandedSeasons[key] = (sWatched < sTotal) && (sIdx === 0 || (item.seasons[sIdx - 1] && item.seasons[sIdx - 1].episodes.every(function(e) { return e.watched; })));
+                expandedSeasons[key] = (sWatched < sTotal) && (sIdx === 0 || (item.seasons[idx - 1] && item.seasons[idx - 1].episodes.every(function(e) { return e.watched; })));
               }
               var isSeasonOpen = !!expandedSeasons[key];
 
@@ -945,20 +941,19 @@
           }
 
           var mRes = await fetch('https://www.omdbapi.com/?s=' + encodeURIComponent(titleQuery) + yearQuery + '&type=movie&apikey=' + OMDB_KEY);
-            var mData = await mRes.json();
-            if (mData.Response === 'True') {
-              currentSearchResults = mData.Search.map(function(m) {
-                return {
-                  id: String(m.imdbID),
-                  name: m.Title + ' (' + m.Year + ')',
-                  rawTitle: m.Title,
-                  type: 'movie'
-                };
-              });
-              renderDropdown(currentSearchResults);
-            } else {
-              // Shows the actual reason: "Invalid API key!", "Movie not found!", etc.
-              resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">' + (mData.Error || 'No results found.') + '</div>';
+          var mData = await mRes.json();
+          if (mData.Response === 'True') {
+            currentSearchResults = mData.Search.map(function(m) {
+              return {
+                id: String(m.imdbID),
+                name: m.Title + ' (' + m.Year + ')',
+                rawTitle: m.Title,
+                type: 'movie'
+              };
+            });
+            renderDropdown(currentSearchResults);
+          } else {
+            resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">' + (mData.Error || 'No results found.') + '</div>';
           }
         }
       } catch (err) {
@@ -1055,6 +1050,7 @@
       }
     }
 
+    // Initial mount
     appRender();
   </script>
 </body>
