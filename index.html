@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrackList</title>
+  <title>TrackMyWatchlist</title>
   <meta name="theme-color" content="#121212">
-  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22TrackList%22%2C%22short_name%22%3A%22TrackList%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23121212%22%2C%22theme_color%22%3A%22%23121212%22%7D">
+  <link rel="manifest" href="./manifest.json">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; }
@@ -213,9 +213,12 @@
 
     // Register basic service worker to enable "Install as App" on Android Chrome
     if ('serviceWorker' in navigator) {
-      const swBlob = new Blob([`self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));`], { type: 'text/javascript' });
-      navigator.serviceWorker.register(URL.createObjectURL(swBlob));
-    }
+      window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('SW Registered!', reg))
+        .catch(err => console.error('SW Error:', err));
+    });
+}
 
     renderWatchlist();
   </script>
