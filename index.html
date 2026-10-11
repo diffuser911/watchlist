@@ -52,16 +52,20 @@
     .season-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .season-title { color: #fbbf24; font-size: 13px; font-weight: bold; }
     .bulk-btn { color: #94a3b8; font-size: 11px; text-decoration: underline; background: none; border: none; cursor: pointer; }
-    .episode-row { display: flex; align-items: center; padding: 6px 0; cursor: pointer; border-bottom: 1px solid #202020; font-size: 13px; }
-    .episode-checkbox { width: 22px; text-align: center; color: #888; font-weight: bold; font-size: 14px; }
+    .episode-row { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #202020; font-size: 13px; }
+    .episode-checkbox { width: 22px; text-align: center; color: #888; font-weight: bold; font-size: 14px; cursor: pointer; }
     .episode-checkbox.watched { color: #4ade80; }
-    .episode-label { flex: 1; margin-left: 6px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .episode-label { flex: 1; margin-left: 6px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
     .episode-label.watched { color: #666; text-decoration: line-through; }
+    
+    /* Favorite Star Button */
+    .star-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #555; padding: 0 6px; line-height: 1; }
+    .star-btn.active { color: #facc15; }
   </style>
 </head>
 <body>
 
-  <!-- Top Header with Backup Tools -->
+  <!-- Top Bar -->
   <div class="top-bar">
     <h1>TrackList</h1>
     <div class="top-actions">
@@ -73,14 +77,14 @@
     </div>
   </div>
 
-  <!-- 3 Navigation Tabs -->
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" id="tab-watchlist" onclick="switchTab('watchlist')">My Watchlist</button>
     <button class="tab" id="tab-tv" onclick="switchTab('tv')">Add TV Shows</button>
     <button class="tab" id="tab-movie" onclick="switchTab('movie')">Add Movies</button>
   </div>
 
-  <!-- Search Panel (Visible only on TV / Movie Tabs) -->
+  <!-- Search Panel (TV & Movie Tabs only) -->
   <div id="searchSection" style="display:none;">
     <div class="search-row">
       <input type="text" id="searchInput" placeholder="Search..." onkeydown="if(event.key==='Enter') searchOnline()">
@@ -89,14 +93,14 @@
     <div id="searchResults" class="dropdown" style="display:none;"></div>
   </div>
 
-  <!-- Filter Panel (Visible on Watchlist Tab) -->
+  <!-- Filter Panel (Watchlist Tab only) -->
   <div id="filterSection" class="filter-box">
-    <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor..." oninput="renderWatchlist()">
+    <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor..." oninput="renderDisplay()">
   </div>
 
-  <!-- Watchlist View Heading & List -->
+  <!-- Content Heading & List -->
   <h3 id="listHeading" style="color:#aaa; font-size:13px; margin-bottom:8px;">Saved Items</h3>
-  <div id="watchlistContainer"></div>
+  <div id="itemsContainer"></div>
 
   <script>
     const OMDB_API_KEY = "9f85df42"; // Replace with your OMDb API key
@@ -107,13 +111,12 @@
 
     function save() {
       localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
-      renderWatchlist();
+      renderDisplay();
     }
 
     function switchTab(tab) {
       currentTab = tab;
 
-      // Update Tab Styles
       ['watchlist', 'tv', 'movie'].forEach(t => {
         document.getElementById(`tab-${t}`).className = (t === tab) ? 'tab active' : 'tab';
       });
@@ -123,7 +126,7 @@
       const searchInput = document.getElementById('searchInput');
       const resBox = document.getElementById('searchResults');
 
-      // Clear search state whenever switching
+      // Reset search inputs on tab switch
       searchInput.value = '';
       resBox.innerHTML = '';
       resBox.style.display = 'none';
@@ -139,12 +142,16 @@
         searchInput.focus();
       }
 
-      renderWatchlist();
+      renderDisplay();
     }
 
     async function searchOnline() {
       const q = document.getElementById('searchInput').value.trim();
-      if (!q) return;
+      if (!q) {
+        renderDisplay();
+        return;
+      }
+
       const resBox = document.getElementById('searchResults');
       resBox.innerHTML = '<div style="padding:12px; color:#888;">Searching...</div>';
       resBox.style.display = 'block';
@@ -171,7 +178,6 @@
             }));
             renderDropdown(currentSearchResults);
           } else {
-            // Fallback: exact match lookup
             const exactRes = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
             const exactData = await exactRes.json();
             if (exactData.Response === 'True') {
@@ -191,6 +197,8 @@
         console.error(err);
         resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network.</div>';
       }
+
+      renderDisplay();
     }
 
     function escapeHtml(str) {
@@ -246,7 +254,6 @@
             watched: false
           });
         } else {
-          // TV Show: Fetch all episodes grouped by season
           const epRes = await fetch(`https://api.tvmaze.com/shows/${item.id}/episodes`);
           const rawEpisodes = await epRes.json();
 
@@ -259,11 +266,11 @@
               name: ep.name || `Episode ${ep.number}`,
               number: ep.number,
               season: ep.season,
-              watched: false
+              watched: false,
+              favorite: false
             });
           });
 
-          // Fetch next upcoming airdate if available
           let nextAirDate = 'TBD';
           let nextEpisodeTitle = '';
           let nextAirStamp = null;
@@ -293,7 +300,7 @@
         }
 
         save();
-        switchTab('watchlist'); // Switch back to Watchlist to see newly added item
+        switchTab('watchlist');
       } catch (err) {
         console.error('Failed to import:', err);
         alert('Could not fetch details. Please try again.');
@@ -302,7 +309,7 @@
 
     function toggleShowAccordion(id) {
       expandedShowId = (expandedShowId === id) ? null : id;
-      renderWatchlist();
+      renderDisplay();
     }
 
     function toggleEpisode(showId, epId) {
@@ -311,6 +318,19 @@
         const updatedSeasons = (item.seasons || []).map(s => ({
           ...s,
           episodes: s.episodes.map(ep => String(ep.id) === String(epId) ? { ...ep, watched: !ep.watched } : ep)
+        }));
+        return { ...item, seasons: updatedSeasons };
+      });
+      save();
+    }
+
+    function toggleEpisodeFavorite(showId, epId, event) {
+      event.stopPropagation();
+      watchlist = watchlist.map(item => {
+        if (String(item.id) !== String(showId)) return item;
+        const updatedSeasons = (item.seasons || []).map(s => ({
+          ...s,
+          episodes: s.episodes.map(ep => String(ep.id) === String(epId) ? { ...ep, favorite: !ep.favorite } : ep)
         }));
         return { ...item, seasons: updatedSeasons };
       });
@@ -345,37 +365,60 @@
     }
 
     function getStats(seasons = []) {
-      let total = 0, watched = 0;
+      let total = 0, watched = 0, favorites = 0;
       seasons.forEach(s => s.episodes.forEach(ep => {
         total++;
         if (ep.watched) watched++;
+        if (ep.favorite) favorites++;
       }));
-      return { total, watched, pct: total ? Math.round((watched / total) * 100) : 0 };
+      return { total, watched, favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
     }
 
-    function renderWatchlist() {
-      const container = document.getElementById('watchlistContainer');
+    function renderDisplay() {
+      const container = document.getElementById('itemsContainer');
       const heading = document.getElementById('listHeading');
-      const filter = document.getElementById('filterInput').value.toLowerCase().trim();
+      
+      let itemsToRender = [];
 
-      const filtered = watchlist.filter(item => {
-        if (!filter) return true;
-        const matchName = item.name?.toLowerCase().includes(filter);
-        if (item.type === 'tv') return matchName;
-        return matchName ||
-               item.director?.toLowerCase().includes(filter) ||
-               item.actors?.toLowerCase().includes(filter) ||
-               item.genres?.some(g => g.toLowerCase().includes(filter));
-      });
+      if (currentTab === 'watchlist') {
+        const filter = document.getElementById('filterInput').value.toLowerCase().trim();
+        itemsToRender = watchlist.filter(item => {
+          if (!filter) return true;
+          const matchName = item.name?.toLowerCase().includes(filter);
+          if (item.type === 'tv') return matchName;
+          return matchName ||
+                 item.director?.toLowerCase().includes(filter) ||
+                 item.actors?.toLowerCase().includes(filter) ||
+                 item.genres?.some(g => g.toLowerCase().includes(filter));
+        });
 
-      heading.textContent = `Saved Items (${filtered.length}${filtered.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
+        heading.style.display = 'block';
+        heading.textContent = `My Watchlist (${itemsToRender.length}${itemsToRender.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
 
-      if (!filtered.length) {
-        container.innerHTML = '<div style="color:#666; font-size:13px; padding:12px 0;">No items found. Tap "Add TV Shows" or "Add Movies" above.</div>';
-        return;
+        if (!itemsToRender.length) {
+          container.innerHTML = '<div style="color:#666; font-size:13px; padding:12px 0;">No items found. Tap "Add TV Shows" or "Add Movies" above.</div>';
+          return;
+        }
+      } else {
+        // Tab is 'tv' or 'movie': only show items matching current search query
+        const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+        heading.style.display = searchQuery ? 'block' : 'none';
+        heading.textContent = `Already in Watchlist (${currentTab.toUpperCase()})`;
+
+        if (!searchQuery) {
+          container.innerHTML = '';
+          return;
+        }
+
+        itemsToRender = watchlist.filter(item => item.type === currentTab && item.name.toLowerCase().includes(searchQuery));
+
+        if (!itemsToRender.length) {
+          container.innerHTML = '';
+          return;
+        }
       }
 
-      container.innerHTML = filtered.map(item => {
+      container.innerHTML = itemsToRender.map(item => {
         if (item.type === 'movie') {
           return `
             <div class="card-container">
@@ -398,7 +441,7 @@
           `;
         }
 
-        // TV Show with Accordion
+        // TV Show Card with Favorites support
         const stats = getStats(item.seasons);
         const isExpanded = expandedShowId === String(item.id);
 
@@ -424,9 +467,16 @@
                       </button>
                     </div>
                     ${s.episodes.map(ep => `
-                      <div class="episode-row" onclick="toggleEpisode('${item.id}', '${ep.id}')">
-                        <span class="episode-checkbox ${ep.watched ? 'watched' : ''}">${ep.watched ? '✓' : '○'}</span>
-                        <span class="episode-label ${ep.watched ? 'watched' : ''}">E${ep.number || '-'}: ${escapeHtml(ep.name)}</span>
+                      <div class="episode-row">
+                        <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
+                          ${ep.watched ? '✓' : '○'}
+                        </span>
+                        <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
+                          E${ep.number || '-'}: ${escapeHtml(ep.name)}
+                        </span>
+                        <button class="star-btn ${ep.favorite ? 'active' : ''}" title="Favorite Episode" onclick="toggleEpisodeFavorite('${item.id}', '${ep.id}', event)">
+                          ${ep.favorite ? '★' : '☆'}
+                        </button>
                       </div>
                     `).join('')}
                   </div>
@@ -443,7 +493,10 @@
               <div class="info">
                 <div class="title">${escapeHtml(item.name)} <span style="font-size:12px; color:#888;">▼</span></div>
                 <div class="sub" style="color:#38bdf8;">Next Air Date: ${escapeHtml(item.nextAirDate)}</div>
-                <div class="progress-text">${stats.watched} / ${stats.total} eps (${stats.pct}%)</div>
+                <div class="progress-text">
+                  ${stats.watched} / ${stats.total} eps (${stats.pct}%) 
+                  ${stats.favorites > 0 ? `· <span style="color:#facc15;">★ ${stats.favorites}</span>` : ''}
+                </div>
                 ${calLink}
               </div>
               <button class="delete-btn" onclick="deleteItem('${item.id}', event)">✕</button>
@@ -493,7 +546,7 @@
       });
     }
 
-    renderWatchlist();
+    renderDisplay();
   </script>
 </body>
 </html>
