@@ -440,6 +440,7 @@
   <h3 id="listHeading" style="color:#aaa; font-size:13px; margin-bottom:8px;">Saved Items</h3>
   <div id="itemsContainer"></div>
 
+  <script src="./config.js"></script>
   <script>
     // 1. Purge obsolete service workers & browser cache
     if ('serviceWorker' in navigator) {
@@ -454,7 +455,7 @@
     }
 
     // 2. Safe API Key Resolution
-    var OMDB_KEY = "YOUR_OMDB_KEY";
+    var OMDB_KEY = (typeof OMDB_API_KEY !== 'undefined') ? OMDB_API_KEY : "YOUR_OMDB_KEY";
     try {
       if (typeof OMDB_API_KEY !== 'undefined') OMDB_KEY = OMDB_API_KEY;
     } catch (e) {}
@@ -944,19 +945,20 @@
           }
 
           var mRes = await fetch('https://www.omdbapi.com/?s=' + encodeURIComponent(titleQuery) + yearQuery + '&type=movie&apikey=' + OMDB_KEY);
-          var mData = await mRes.json();
-          if (mData.Response === 'True') {
-            currentSearchResults = mData.Search.map(function(m) {
-              return {
-                id: String(m.imdbID),
-                name: m.Title + ' (' + m.Year + ')',
-                rawTitle: m.Title,
-                type: 'movie'
-              };
-            });
-            renderDropdown(currentSearchResults);
-          } else {
-            resBox.innerHTML = '<div style="padding:12px; color:#888;">No results found.</div>';
+            var mData = await mRes.json();
+            if (mData.Response === 'True') {
+              currentSearchResults = mData.Search.map(function(m) {
+                return {
+                  id: String(m.imdbID),
+                  name: m.Title + ' (' + m.Year + ')',
+                  rawTitle: m.Title,
+                  type: 'movie'
+                };
+              });
+              renderDropdown(currentSearchResults);
+            } else {
+              // Shows the actual reason: "Invalid API key!", "Movie not found!", etc.
+              resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">' + (mData.Error || 'No results found.') + '</div>';
           }
         }
       } catch (err) {
