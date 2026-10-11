@@ -11,12 +11,12 @@
     body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; }
     
     /* Top Bar */
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     .top-bar h1 { font-size: 22px; font-weight: bold; }
     .top-actions { display: flex; gap: 6px; }
 
     /* Tabs */
-    .tabs { display: flex; background: #1e1e1e; border-radius: 8px; padding: 3px; margin-bottom: 14px; }
+    .tabs { display: flex; background: #1e1e1e; border-radius: 8px; padding: 3px; margin-bottom: 12px; }
     .tab { flex: 1; padding: 8px; text-align: center; background: none; border: none; color: #888; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 13px; }
     .tab.active { background: #333; color: #fff; }
 
@@ -28,10 +28,19 @@
     .dropdown { background: #222; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #333; }
     .drop-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #2e2e2e; cursor: pointer; align-items: center; }
     .drop-item:active { background: #2a2a2a; }
-    .filter-box { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 14px; }
+    
+    /* Controls Bar (Filter + View Toggle) */
+    .controls-panel { margin-bottom: 12px; }
+    .status-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+    .status-pills::-webkit-scrollbar { display: none; }
+    .pill { background: #1e1e1e; border: 1px solid #333; color: #888; padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .pill.active { background: #e50914; border-color: #e50914; color: #fff; }
 
-    /* Card & Accordion */
-    .card-container { background: #1e1e1e; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #2a2a2a; }
+    .sub-controls { display: flex; gap: 8px; align-items: center; }
+    .view-toggle { background: #1e1e1e; border: 1px solid #333; color: #aaa; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+
+    /* Standard Card (Detailed Mode) */
+    .card-container { background: #1e1e1e; border-radius: 8px; margin-bottom: 10px; overflow: hidden; border: 1px solid #2a2a2a; }
     .card { display: flex; gap: 12px; padding: 12px; align-items: flex-start; cursor: pointer; }
     .poster { width: 55px; height: 80px; object-fit: cover; border-radius: 4px; background: #2a2a2a; flex-shrink: 0; }
     .info { flex: 1; min-width: 0; }
@@ -46,20 +55,30 @@
     .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 5px; }
     .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 4px; margin-left: 6px; }
 
-    /* TV Seasons & Episodes */
-    .episodes-panel { background: #161616; border-top: 1px solid #2d2d2d; padding: 12px; }
-    .season-block { margin-bottom: 14px; }
-    .season-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .season-title { color: #fbbf24; font-size: 13px; font-weight: bold; }
-    .bulk-btn { color: #94a3b8; font-size: 11px; text-decoration: underline; background: none; border: none; cursor: pointer; }
-    .episode-row { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #202020; font-size: 13px; }
-    .episode-checkbox { width: 22px; text-align: center; color: #888; font-weight: bold; font-size: 14px; cursor: pointer; }
+    /* Compact List Layout */
+    .compact-mode .card { padding: 8px 10px; align-items: center; }
+    .compact-mode .poster { width: 36px; height: 50px; }
+    .compact-mode .sub, .compact-mode .tags, .compact-mode .btn-cal { display: none; }
+    .compact-mode .title { font-size: 13px; margin-bottom: 0; }
+
+    /* TV Episode Modal Overlay */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: flex-end; z-index: 1000; }
+    .modal-sheet { background: #181818; width: 100%; max-width: 600px; max-height: 85vh; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #333; }
+    .modal-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .modal-close { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; }
+
+    /* Episode Rows inside Modal */
+    .season-block { margin-bottom: 16px; }
+    .season-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .season-title { color: #fbbf24; font-size: 14px; font-weight: bold; }
+    .bulk-btn { color: #94a3b8; font-size: 12px; text-decoration: underline; background: none; border: none; cursor: pointer; }
+    .episode-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #222; font-size: 13px; }
+    .episode-checkbox { width: 26px; text-align: center; color: #888; font-weight: bold; font-size: 15px; cursor: pointer; }
     .episode-checkbox.watched { color: #4ade80; }
     .episode-label { flex: 1; margin-left: 6px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
     .episode-label.watched { color: #666; text-decoration: line-through; }
-    
-    /* Favorite Star Button */
-    .star-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #555; padding: 0 6px; line-height: 1; }
+    .star-btn { background: none; border: none; font-size: 17px; cursor: pointer; color: #555; padding: 0 6px; }
     .star-btn.active { color: #facc15; }
   </style>
 </head>
@@ -93,40 +112,63 @@
     <div id="searchResults" class="dropdown" style="display:none;"></div>
   </div>
 
-  <!-- Filter Panel (Watchlist Tab only) -->
-  <div id="filterSection" class="filter-box">
-    <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor..." oninput="renderDisplay()">
+  <!-- Watchlist Filter & Controls Panel -->
+  <div id="controlsSection" class="controls-panel">
+    <div class="status-pills">
+      <button class="pill active" onclick="setStatusFilter('all')">All</button>
+      <button class="pill" onclick="setStatusFilter('watching')">📺 Watching</button>
+      <button class="pill" onclick="setStatusFilter('to_watch')">🍿 To Watch</button>
+      <button class="pill" onclick="setStatusFilter('favorites')">⭐ Favorites</button>
+      <button class="pill" onclick="setStatusFilter('completed')">✓ Finished</button>
+    </div>
+
+    <div class="sub-controls">
+      <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor..." oninput="renderDisplay()">
+      <button class="view-toggle" id="viewToggleBtn" onclick="toggleViewMode()">☰ Compact</button>
+    </div>
   </div>
 
   <!-- Content Heading & List -->
   <h3 id="listHeading" style="color:#aaa; font-size:13px; margin-bottom:8px;">Saved Items</h3>
   <div id="itemsContainer"></div>
 
+  <!-- TV Episodes Modal Drawer -->
+  <div class="modal-overlay" id="episodesModal" onclick="closeModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle" style="font-size:16px;">Episodes</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
   <script>
     const OMDB_API_KEY = "9f85df42"; // Replace with your OMDb API key
-    let currentTab = 'watchlist'; // 'watchlist' | 'tv' | 'movie'
+    let currentTab = 'watchlist'; 
+    let currentStatusFilter = 'all'; 
+    let isCompactView = false;
+    let currentModalShowId = null;
     let currentSearchResults = [];
-    let expandedShowId = null;
     let watchlist = JSON.parse(localStorage.getItem('tracklist_items_v2') || '[]');
 
     function save() {
       localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
       renderDisplay();
+      if (currentModalShowId) renderModalContent();
     }
 
     function switchTab(tab) {
       currentTab = tab;
-
       ['watchlist', 'tv', 'movie'].forEach(t => {
         document.getElementById(`tab-${t}`).className = (t === tab) ? 'tab active' : 'tab';
       });
 
       const searchSection = document.getElementById('searchSection');
-      const filterSection = document.getElementById('filterSection');
+      const controlsSection = document.getElementById('controlsSection');
       const searchInput = document.getElementById('searchInput');
       const resBox = document.getElementById('searchResults');
 
-      // Reset search inputs on tab switch
       searchInput.value = '';
       resBox.innerHTML = '';
       resBox.style.display = 'none';
@@ -134,10 +176,10 @@
 
       if (tab === 'watchlist') {
         searchSection.style.display = 'none';
-        filterSection.style.display = 'block';
+        controlsSection.style.display = 'block';
       } else {
         searchSection.style.display = 'block';
-        filterSection.style.display = 'none';
+        controlsSection.style.display = 'none';
         searchInput.placeholder = `Search ${tab === 'tv' ? 'TV shows' : 'movies'} online...`;
         searchInput.focus();
       }
@@ -145,12 +187,23 @@
       renderDisplay();
     }
 
+    function setStatusFilter(status) {
+      currentStatusFilter = status;
+      const pills = document.querySelectorAll('.status-pills .pill');
+      const labels = ['all', 'watching', 'to_watch', 'favorites', 'completed'];
+      pills.forEach((p, idx) => p.className = (labels[idx] === status) ? 'pill active' : 'pill');
+      renderDisplay();
+    }
+
+    function toggleViewMode() {
+      isCompactView = !isCompactView;
+      document.getElementById('viewToggleBtn').textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
+      renderDisplay();
+    }
+
     async function searchOnline() {
       const q = document.getElementById('searchInput').value.trim();
-      if (!q) {
-        renderDisplay();
-        return;
-      }
+      if (!q) { renderDisplay(); return; }
 
       const resBox = document.getElementById('searchResults');
       resBox.innerHTML = '<div style="padding:12px; color:#888;">Searching...</div>';
@@ -167,7 +220,16 @@
           }));
           renderDropdown(currentSearchResults);
         } else {
-          const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
+          // Check for 4-digit year query
+          let titleQuery = q;
+          let yearQuery = '';
+          const yearMatch = q.match(/\b(19\d\d|20\d\d)\b/);
+          if (yearMatch) {
+            yearQuery = `&y=${yearMatch[0]}`;
+            titleQuery = q.replace(yearMatch[0], '').trim();
+          }
+
+          const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(titleQuery)}${yearQuery}&type=movie&apikey=${OMDB_API_KEY}`);
           const data = await res.json();
           if (data.Response === 'True') {
             currentSearchResults = data.Search.map(m => ({
@@ -178,7 +240,7 @@
             }));
             renderDropdown(currentSearchResults);
           } else {
-            const exactRes = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(q)}&type=movie&apikey=${OMDB_API_KEY}`);
+            const exactRes = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(titleQuery)}${yearQuery}&type=movie&apikey=${OMDB_API_KEY}`);
             const exactData = await exactRes.json();
             if (exactData.Response === 'True') {
               currentSearchResults = [{
@@ -203,12 +265,7 @@
 
     function escapeHtml(str) {
       if (!str) return '';
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     function renderDropdown(items) {
@@ -283,9 +340,7 @@
               nextEpisodeTitle = nextEp.name || '';
               nextAirStamp = nextEp.airstamp || null;
             }
-          } catch (e) {
-            console.log('No next episode found');
-          }
+          } catch (e) {}
 
           watchlist.push({
             id: String(item.id),
@@ -307,9 +362,51 @@
       }
     }
 
-    function toggleShowAccordion(id) {
-      expandedShowId = (expandedShowId === id) ? null : id;
-      renderDisplay();
+    // Modal Drawer Functions
+    function openShowModal(id) {
+      currentModalShowId = String(id);
+      renderModalContent();
+      document.getElementById('episodesModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      currentModalShowId = null;
+      document.getElementById('episodesModal').style.display = 'none';
+    }
+
+    function renderModalContent() {
+      const show = watchlist.find(w => String(w.id) === currentModalShowId);
+      if (!show) return closeModal();
+
+      document.getElementById('modalTitle').textContent = show.name;
+      const body = document.getElementById('modalBody');
+
+      body.innerHTML = (show.seasons || []).map(s => {
+        const allWatched = s.episodes.length > 0 && s.episodes.every(ep => ep.watched);
+        return `
+          <div class="season-block">
+            <div class="season-header">
+              <span class="season-title">Season ${s.season}</span>
+              <button class="bulk-btn" onclick="toggleSeasonBulk('${show.id}', ${s.season}, ${!allWatched})">
+                ${allWatched ? 'Unmark Season' : 'Watch Season'}
+              </button>
+            </div>
+            ${s.episodes.map(ep => `
+              <div class="episode-row">
+                <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${show.id}', '${ep.id}')">
+                  ${ep.watched ? '✓' : '○'}
+                </span>
+                <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${show.id}', '${ep.id}')">
+                  E${ep.number \vert{}\vert{} '-'}:${escapeHtml(ep.name)}
+                </span>
+                <button class="star-btn ${ep.favorite ? 'active' : ''}" onclick="toggleEpisodeFavorite('${show.id}', '${ep.id}', event)">
+                  ${ep.favorite ? '★' : '☆'}
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }).join('');
     }
 
     function toggleEpisode(showId, epId) {
@@ -342,10 +439,7 @@
         if (String(item.id) !== String(showId)) return item;
         const updatedSeasons = (item.seasons || []).map(s => {
           if (s.season !== seasonNum) return s;
-          return {
-            ...s,
-            episodes: s.episodes.map(ep => ({ ...ep, watched: markWatched }))
-          };
+          return { ...s, episodes: s.episodes.map(ep => ({ ...ep, watched: markWatched })) };
         });
         return { ...item, seasons: updatedSeasons };
       });
@@ -383,6 +477,28 @@
       if (currentTab === 'watchlist') {
         const filter = document.getElementById('filterInput').value.toLowerCase().trim();
         itemsToRender = watchlist.filter(item => {
+          // Status Pill Filter
+          if (currentStatusFilter === 'to_watch' && (item.type !== 'movie' || item.watched)) return false;
+          if (currentStatusFilter === 'watching') {
+            if (item.type !== 'tv') return false;
+            const stats = getStats(item.seasons);
+            if (stats.watched >= stats.total) return false;
+          }
+          if (currentStatusFilter === 'completed') {
+            if (item.type === 'movie' && !item.watched) return false;
+            if (item.type === 'tv') {
+              const stats = getStats(item.seasons);
+              if (stats.total === 0 || stats.watched < stats.total) return false;
+            }
+          }
+          if (currentStatusFilter === 'favorites') {
+            if (item.type === 'tv') {
+              const stats = getStats(item.seasons);
+              if (stats.favorites === 0) return false;
+            } else return false;
+          }
+
+          // Search String Filter
           if (!filter) return true;
           const matchName = item.name?.toLowerCase().includes(filter);
           if (item.type === 'tv') return matchName;
@@ -396,29 +512,19 @@
         heading.textContent = `My Watchlist (${itemsToRender.length}${itemsToRender.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
 
         if (!itemsToRender.length) {
-          container.innerHTML = '<div style="color:#666; font-size:13px; padding:12px 0;">No items found. Tap "Add TV Shows" or "Add Movies" above.</div>';
+          container.innerHTML = '<div style="color:#666; font-size:13px; padding:12px 0;">No items found matching the selected filter.</div>';
           return;
         }
       } else {
-        // Tab is 'tv' or 'movie': only show items if there are actual matches in watchlist
         const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
-
-        // Require at least 2 characters to prevent single-letter false matches
         if (!searchQuery || searchQuery.length < 2) {
           heading.style.display = 'none';
           container.innerHTML = '';
           return;
         }
 
-        // Exact word or full title match check
-        itemsToRender = watchlist.filter(item => {
-          if (item.type !== currentTab) return false;
-          const name = item.name.toLowerCase();
-          // Match if user's search query matches the title or title contains the full query
-          return name.includes(searchQuery);
-        });
+        itemsToRender = watchlist.filter(item => item.type === currentTab && item.name.toLowerCase().includes(searchQuery));
 
-        // ONLY show the heading if items were actually found!
         if (!itemsToRender.length) {
           heading.style.display = 'none';
           container.innerHTML = '';
@@ -428,6 +534,9 @@
         heading.style.display = 'block';
         heading.textContent = `Already in Watchlist (${itemsToRender.length})`;
       }
+
+      container.className = isCompactView ? 'compact-mode' : '';
+
       container.innerHTML = itemsToRender.map(item => {
         if (item.type === 'movie') {
           return `
@@ -451,10 +560,8 @@
           `;
         }
 
-        // TV Show Card with Favorites support
+        // TV Show Card (Tapping opens Modal Drawer)
         const stats = getStats(item.seasons);
-        const isExpanded = expandedShowId === String(item.id);
-
         let calLink = '';
         if (item.nextAirStamp) {
           const d = new Date(item.nextAirStamp);
@@ -462,46 +569,12 @@
           calLink = `<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('New ' + item.name + ' Episode')}&dates=${iso}/${iso}&details=${encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar Reminder</a>`;
         }
 
-        let episodesHtml = '';
-        if (isExpanded && item.seasons) {
-          episodesHtml = `
-            <div class="episodes-panel">
-              ${item.seasons.map(s => {
-                const allWatched = s.episodes.length > 0 && s.episodes.every(ep => ep.watched);
-                return `
-                  <div class="season-block">
-                    <div class="season-header">
-                      <span class="season-title">Season ${s.season}</span>
-                      <button class="bulk-btn" onclick="toggleSeasonBulk('${item.id}', ${s.season},${!allWatched})">
-                        ${allWatched ? 'Unmark Season' : 'Watch Season'}
-                      </button>
-                    </div>
-                    ${s.episodes.map(ep => `
-                      <div class="episode-row">
-                        <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
-                          ${ep.watched ? '✓' : '○'}
-                        </span>
-                        <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
-                          E${ep.number || '-'}: ${escapeHtml(ep.name)}
-                        </span>
-                        <button class="star-btn ${ep.favorite ? 'active' : ''}" title="Favorite Episode" onclick="toggleEpisodeFavorite('${item.id}', '${ep.id}', event)">
-                          ${ep.favorite ? '★' : '☆'}
-                        </button>
-                      </div>
-                    `).join('')}
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          `;
-        }
-
         return `
           <div class="card-container">
-            <div class="card" onclick="toggleShowAccordion('${item.id}')">
+            <div class="card" onclick="openShowModal('${item.id}')">
               ${item.image ? `<img src="${escapeHtml(item.image)}" class="poster" loading="lazy">` : '<div class="poster"></div>'}
               <div class="info">
-                <div class="title">${escapeHtml(item.name)} <span style="font-size:12px; color:#888;">▼</span></div>
+                <div class="title">${escapeHtml(item.name)} <span style="font-size:12px; color:#38bdf8;">Episodes ↗</span></div>
                 <div class="sub" style="color:#38bdf8;">Next Air Date: ${escapeHtml(item.nextAirDate)}</div>
                 <div class="progress-text">
                   ${stats.watched} / ${stats.total} eps (${stats.pct}%) 
@@ -511,7 +584,6 @@
               </div>
               <button class="delete-btn" onclick="deleteItem('${item.id}', event)">✕</button>
             </div>
-            ${episodesHtml}
           </div>
         `;
       }).join('');
