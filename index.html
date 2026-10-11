@@ -7,14 +7,14 @@
   <meta name="theme-color" content="#121212">
   <link rel="manifest" href="./manifest.json">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; }
     
     /* Top Bar */
     .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     .top-title-group { display: flex; align-items: baseline; gap: 8px; }
     .top-bar h1 { font-size: 22px; font-weight: bold; }
-    .version-link { color: #38bdf8; font-size: 11px; text-decoration: none; cursor: pointer; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; }
+    .version-btn { color: #38bdf8; font-size: 11px; cursor: pointer; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; }
     .top-actions { display: flex; gap: 6px; }
 
     /* Tabs */
@@ -51,9 +51,9 @@
     .progress-text { color: #38bdf8; font-size: 12px; font-weight: 500; margin-top: 4px; }
     .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
     .tag { background: #2a2a2a; color: #38bdf8; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-    .btn-action { background: #262626; border: none; color: #aaa; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 500; }
+    .btn-action { background: #262626; border: 1px solid #383838; color: #aaa; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 500; }
     .btn-action:hover { color: #fff; }
-    .btn-watched { background: #14532d; color: #4ade80; }
+    .btn-watched { background: #14532d; color: #4ade80; border-color: #15803d; }
     .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 5px; }
     .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 4px; margin-left: 6px; }
 
@@ -64,11 +64,11 @@
     .compact-mode .title { font-size: 13px; margin-bottom: 0; }
 
     /* Modals */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: flex-end; z-index: 1000; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: flex-end; z-index: 9999; }
     .modal-sheet { background: #181818; width: 100%; max-width: 600px; max-height: 85vh; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #333; }
     .modal-header { padding: 14px 16px; border-bottom: 1px solid #2a2a2a; display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
-    .modal-close { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; }
+    .modal-close { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 4px 8px; }
 
     /* Episode Rows inside Modal */
     .season-block { margin-bottom: 16px; }
@@ -83,25 +83,24 @@
     .star-btn { background: none; border: none; font-size: 17px; cursor: pointer; color: #555; padding: 0 6px; }
     .star-btn.active { color: #facc15; }
     
-    /* Notes Modal Styles */
     .notes-list { line-height: 1.6; font-size: 13px; color: #bbb; padding-left: 18px; margin-top: 8px; }
     .notes-list li { margin-bottom: 8px; }
   </style>
 </head>
 <body>
 
+  <!-- Hidden native file input -->
+  <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;">
+
   <!-- Top Bar -->
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackList</h1>
-      <span class="version-link" onclick="openVersionModal()">v2.2 (Notes)</span>
+      <span class="version-btn" onclick="openVersionModal()">v2.3 (Notes)</span>
     </div>
     <div class="top-actions">
       <button class="btn-action" onclick="exportBackup()">📥 Export</button>
-      <label class="btn-action" style="display:inline-flex; align-items:center;">
-        📤 Import
-        <input type="file" id="importFileInput" accept=".json" onchange="importBackup(event)" style="display:none;">
-      </label>
+      <button class="btn-action" onclick="triggerImport()">📤 Import</button>
     </div>
   </div>
 
@@ -156,35 +155,31 @@
   <div class="modal-overlay" id="versionModal" onclick="closeVersionModal(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <h3 style="font-size:16px;">TrackList v2.2 — Release Notes</h3>
+        <h3 style="font-size:16px;">TrackList v2.3 Notes</h3>
         <button class="modal-close" onclick="closeVersionModal()">✕</button>
       </div>
       <div class="modal-body">
-        <h4 style="color:#fbbf24; font-size:14px; margin-bottom:6px;">What's New in v2.2:</h4>
+        <h4 style="color:#fbbf24; font-size:14px; margin-bottom:6px;">Changelog:</h4>
         <ul class="notes-list">
-          <li><strong>Universal JSON Migration:</strong> Fixed backup importer with automatic normalization across past data schemas.</li>
-          <li><strong>Watchlist Isolation:</strong> "Saved Items" strictly restricted to the Watchlist tab.</li>
-          <li><strong>Dedicated Episode Drawer:</strong> Full-season accordion moved to an overlay sheet to prevent infinite scroll fatigue.</li>
-          <li><strong>Status Filter Pills:</strong> Instant filtering by <em>Watching</em>, <em>To Watch</em>, <em>Favorites</em>, and <em>Finished</em>.</li>
-          <li><strong>Compact List View Toggle:</strong> Switch between poster cards and dense 1-line list layouts.</li>
-          <li><strong>Episode Favoriting:</strong> Star individual episodes across seasons.</li>
+          <li><strong>Direct Import Fix:</strong> Resolved Android Chrome file picker trap by isolating the input element and binding explicit change handlers.</li>
+          <li><strong>Event Loop Unfreeze:</strong> Fixed modal closure state to prevent unhandled reference errors from freezing card taps.</li>
+          <li><strong>Legacy Backup Auto-Format:</strong> Full compatibility with historical JSON schema exports.</li>
+          <li><strong>Compact List Mode:</strong> Quick toggling between detailed posters and dense rows.</li>
         </ul>
       </div>
     </div>
   </div>
 
   <script>
-    const OMDB_API_KEY = "9f85df42"; // Replace with your OMDb API key
+    const OMDB_API_KEY = "9f85df42"; 
     let currentTab = 'watchlist'; 
     let currentStatusFilter = 'all'; 
     let isCompactView = false;
     let currentModalShowId = null;
     let currentSearchResults = [];
+    let watchlist = [];
 
-    // Load and normalize watchlist from local storage
-    let rawStored = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
-    let watchlist = normalizeWatchlist(JSON.parse(rawStored));
-
+    // Safe JSON normalizer for incoming exports and local storage
     function normalizeWatchlist(items) {
       if (!Array.isArray(items)) return [];
       return items.map(item => {
@@ -208,10 +203,25 @@
       });
     }
 
+    // Initialize state
+    try {
+      const rawStored = localStorage.getItem('tracklist_items_v2') || localStorage.getItem('tracklist_items') || '[]';
+      watchlist = normalizeWatchlist(JSON.parse(rawStored));
+    } catch (e) {
+      console.warn("Storage initial load failed:", e);
+      watchlist = [];
+    }
+
     function save() {
-      localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
+      try {
+        localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
+      } catch (e) {
+        console.error("Save to localStorage failed:", e);
+      }
       renderDisplay();
-      if (currentModalShowId) renderModalContent();
+      if (currentModalShowId && document.getElementById('episodesModal').style.display === 'flex') {
+        renderModalContent();
+      }
     }
 
     function switchTab(tab) {
@@ -237,7 +247,6 @@
         searchSection.style.display = 'block';
         controlsSection.style.display = 'none';
         searchInput.placeholder = `Search ${tab === 'tv' ? 'TV shows' : 'movies'} online...`;
-        searchInput.focus();
       }
 
       renderDisplay();
@@ -412,7 +421,7 @@
         save();
         switchTab('watchlist');
       } catch (err) {
-        console.error('Failed to import:', err);
+        console.error('Failed to import item:', err);
         alert('Could not fetch details. Please try again.');
       }
     }
@@ -437,7 +446,7 @@
     }
 
     function renderModalContent() {
-      const show = watchlist.find(w => String(w.id) === currentModalShowId);
+      const show = watchlist.find(w => String(w.id) === String(currentModalShowId));
       if (!show) return closeModal();
 
       document.getElementById('modalTitle').textContent = show.name;
@@ -508,13 +517,14 @@
       save();
     }
 
-    function toggleMovieWatched(id) {
+    function toggleMovieWatched(id, event) {
+      if (event) event.stopPropagation();
       watchlist = watchlist.map(item => String(item.id) === String(id) ? { ...item, watched: !item.watched } : item);
       save();
     }
 
     function deleteItem(id, event) {
-      event.stopPropagation();
+      if (event) event.stopPropagation();
       if (!confirm('Remove this title from your list?')) return;
       watchlist = watchlist.filter(w => String(w.id) !== String(id));
       save();
@@ -610,7 +620,7 @@
                   </div>
                   <div class="sub">Dir: ${escapeHtml(item.director)}</div>
                   <div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ${escapeHtml(item.actors)}</div>
-                  <button class="btn-action ${item.watched ? 'btn-watched' : ''}" onclick="toggleMovieWatched('${item.id}')">
+                  <button class="btn-action ${item.watched ? 'btn-watched' : ''}" onclick="toggleMovieWatched('${item.id}', event)">
                     ${item.watched ? '✓ Watched' : '○ Mark as Watched'}
                   </button>
                 </div>
@@ -625,7 +635,7 @@
         if (item.nextAirStamp) {
           const d = new Date(item.nextAirStamp);
           const iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-          calLink = `<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('New ' + item.name + ' Episode')}&dates=${iso}/${iso}&details=${encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar Reminder</a>`;
+          calLink = `<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('New ' + item.name + ' Episode')}&dates=${iso}/${iso}&details=${encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>`;
         }
 
         return `
@@ -658,35 +668,40 @@
       downloadAnchor.remove();
     }
 
-    function importBackup(event) {
-      const file = event.target.files && event.target.files[0];
+    // Direct invocation without label event interception
+    function triggerImport() {
+      const fileInput = document.getElementById('importFileInput');
+      fileInput.value = '';
+      fileInput.click();
+    }
+
+    // Attached via addEventListener for complete platform reliability
+    document.getElementById('importFileInput').addEventListener('change', function(e) {
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
 
-      const fileReader = new FileReader();
-      fileReader.onload = function(e) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
         try {
-          const imported = JSON.parse(e.target.result);
-          if (Array.isArray(imported)) {
-            watchlist = normalizeWatchlist(imported);
+          const raw = JSON.parse(evt.target.result);
+          if (Array.isArray(raw)) {
+            watchlist = normalizeWatchlist(raw);
             save();
-            alert('Watchlist restored successfully!');
+            alert(`Watchlist restored successfully! Loaded ${watchlist.length} items.`);
           } else {
-            alert('Invalid backup structure.');
+            alert('Invalid backup structure: expected a JSON array.');
           }
-        } catch {
-          alert('Could not parse JSON file.');
-        } finally {
-          // Reset file input so re-uploading the same file always triggers
-          document.getElementById('importFileInput').value = '';
+        } catch (err) {
+          console.error(err);
+          alert('Could not parse JSON file. Ensure it is a valid backup.');
         }
       };
-      fileReader.readAsText(file);
-    }
+      reader.readAsText(file);
+    });
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('SW Registered', reg))
           .catch(err => console.error('SW Error', err));
       });
     }
