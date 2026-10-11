@@ -2,104 +2,102 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TrackMyWatchList</title>
   <meta name="theme-color" content="#121212">
   <link rel="manifest" href="./manifest.json">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1); }
-    body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #121212; color: #fff; padding: 16px; max-width: 600px; margin: 0 auto; touch-action: manipulation; }
     
     /* Top Bar */
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
     .top-title-group { display: flex; align-items: baseline; gap: 8px; }
     .top-bar h1 { font-size: 20px; font-weight: bold; }
-    .version-badge { color: #38bdf8; font-size: 11px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; border: 1px solid #333; }
-    .top-actions { display: flex; gap: 6px; }
+    .version-badge { color: #38bdf8; font-size: 11px; background: #1a1a1a; padding: 3px 6px; border-radius: 4px; border: 1px solid #333; }
+    .top-actions { display: flex; gap: 8px; }
+
+    /* Buttons */
+    button { touch-action: manipulation; -webkit-appearance: none; appearance: none; }
+    .btn-action { background: #262626; border: 1px solid #383838; color: #eee; min-height: 38px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-action:active { background: #333; }
+    .btn-watched { background: #14532d; color: #4ade80; border-color: #15803d; }
 
     /* Tabs */
-    .tabs { display: flex; background: #1e1e1e; border-radius: 8px; padding: 3px; margin-bottom: 12px; }
-    .tab { flex: 1; padding: 10px 4px; text-align: center; background: none; border: none; color: #888; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 13px; }
+    .tabs { display: flex; background: #1e1e1e; border-radius: 8px; padding: 4px; margin-bottom: 14px; gap: 4px; }
+    .tab { flex: 1; min-height: 40px; text-align: center; background: none; border: none; color: #888; font-weight: bold; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: center; }
     .tab.active { background: #333; color: #fff; }
 
     /* Search & Filter Rows */
     .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
-    input[type="text"] { flex: 1; padding: 10px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 14px; }
-    input[type="text"]:focus { outline: none; border-color: #555; }
-    button.btn-search { background: #e50914; color: #fff; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    input[type="text"] { flex: 1; min-height: 42px; padding: 8px 12px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 15px; }
+    input[type="text"]:focus { outline: none; border-color: #666; }
+    button.btn-search { background: #e50914; color: #fff; border: none; min-height: 42px; padding: 0 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; }
+    
     .dropdown { background: #222; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #333; }
-    .drop-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #2e2e2e; cursor: pointer; align-items: center; }
+    .drop-item { display: flex; justify-content: space-between; min-height: 46px; padding: 10px 14px; border-bottom: 1px solid #2e2e2e; cursor: pointer; align-items: center; }
     .drop-item:active { background: #2a2a2a; }
     
     /* Controls Bar */
-    .controls-panel { margin-bottom: 12px; }
-    .status-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+    .controls-panel { margin-bottom: 14px; }
+    .status-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
     .status-pills::-webkit-scrollbar { display: none; }
-    .pill { background: #1e1e1e; border: 1px solid #333; color: #888; padding: 6px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .pill { background: #1e1e1e; border: 1px solid #333; color: #888; min-height: 34px; padding: 4px 14px; border-radius: 17px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; }
     .pill.active { background: #e50914; border-color: #e50914; color: #fff; }
 
     .sub-controls { display: flex; gap: 8px; align-items: center; }
-    .view-toggle { background: #1e1e1e; border: 1px solid #333; color: #aaa; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .view-toggle { background: #1e1e1e; border: 1px solid #333; color: #aaa; min-height: 42px; padding: 0 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 
     /* Cards */
-    .card-container { background: #1e1e1e; border-radius: 8px; margin-bottom: 10px; overflow: hidden; border: 1px solid #2a2a2a; }
+    .card-container { background: #1e1e1e; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #2a2a2a; }
     .card-main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
     .poster { width: 55px; height: 80px; object-fit: cover; border-radius: 4px; background: #2a2a2a; flex-shrink: 0; }
     .info { flex: 1; min-width: 0; }
-    .title { font-weight: bold; font-size: 15px; margin-bottom: 3px; }
+    .title { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
     .sub { color: #888; font-size: 12px; margin-bottom: 4px; }
-    .progress-text { color: #38bdf8; font-size: 12px; font-weight: 500; margin-top: 4px; }
+    .progress-text { color: #38bdf8; font-size: 12px; font-weight: 500; margin-top: 4px; margin-bottom: 6px; }
     .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-    .tag { background: #2a2a2a; color: #38bdf8; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-    .btn-action { background: #262626; border: 1px solid #383838; color: #aaa; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
-    .btn-action:hover { color: #fff; }
-    .btn-watched { background: #14532d; color: #4ade80; border-color: #15803d; }
-    .btn-expand { background: #222; border: 1px solid #383838; color: #38bdf8; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 4px; display: inline-block; }
-    .btn-cal { background: #0369a1; color: #fff; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 5px; }
-    .delete-btn { color: #ff5555; background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; margin-left: 6px; }
+    .tag { background: #2a2a2a; color: #38bdf8; font-size: 11px; padding: 3px 6px; border-radius: 4px; }
+    .btn-expand { background: #222; border: 1px solid #383838; color: #38bdf8; min-height: 32px; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; margin-top: 4px; }
+    .btn-cal { background: #0369a1; color: #fff; text-decoration: none; min-height: 32px; padding: 4px 10px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; margin-top: 5px; }
+    .delete-btn { color: #ff5555; background: none; border: none; font-size: 20px; cursor: pointer; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
 
     /* Compact List Layout */
     .compact-mode .card-main { padding: 8px 10px; align-items: center; }
     .compact-mode .poster { width: 36px; height: 50px; }
     .compact-mode .sub, .compact-mode .tags, .compact-mode .btn-cal { display: none; }
-    .compact-mode .title { font-size: 13px; margin-bottom: 0; }
+    .compact-mode .title { font-size: 14px; margin-bottom: 0; }
 
-    /* TV Episode Inline Accordion */
+    /* Accordion */
     .episodes-panel { background: #161616; border-top: 1px solid #2d2d2d; padding: 8px 12px; }
-    .season-block { margin-bottom: 8px; border-bottom: 1px solid #222; }
+    .season-block { margin-bottom: 6px; border-bottom: 1px solid #222; }
     .season-block:last-child { border-bottom: none; }
     
-    .season-header { 
-      display: flex; justify-content: space-between; align-items: center; 
-      padding: 10px 4px; cursor: pointer; 
-    }
-    .season-title-group { display: flex; align-items: center; gap: 6px; }
-    .season-title { color: #fbbf24; font-size: 13px; font-weight: bold; }
-    .season-indicator { font-size: 11px; color: #777; }
-    .season-stats { font-size: 11px; color: #888; }
-    .bulk-btn { color: #94a3b8; font-size: 11px; text-decoration: underline; background: none; border: none; cursor: pointer; padding: 4px 6px; }
+    .season-header { display: flex; justify-content: space-between; align-items: center; min-height: 42px; padding: 6px 4px; cursor: pointer; }
+    .season-title-group { display: flex; align-items: center; gap: 8px; }
+    .season-title { color: #fbbf24; font-size: 14px; font-weight: bold; }
+    .season-indicator { font-size: 12px; color: #777; }
+    .season-stats { font-size: 12px; color: #888; }
+    .bulk-btn { color: #94a3b8; font-size: 12px; text-decoration: underline; background: none; border: none; cursor: pointer; min-height: 36px; padding: 0 8px; display: flex; align-items: center; }
     
     .season-episodes-list { padding: 4px 0 10px 0; }
-    .episode-row { display: flex; align-items: center; padding: 8px 4px; border-bottom: 1px solid #1c1c1c; font-size: 13px; }
-    .episode-checkbox { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #888; font-weight: bold; font-size: 16px; cursor: pointer; }
+    .episode-row { display: flex; align-items: center; min-height: 42px; padding: 4px 2px; border-bottom: 1px solid #1c1c1c; font-size: 13px; }
+    .episode-checkbox { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; color: #888; font-weight: bold; font-size: 18px; cursor: pointer; }
     .episode-checkbox.watched { color: #4ade80; }
     .episode-label { flex: 1; margin-left: 6px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
     .episode-label.watched { color: #666; text-decoration: line-through; }
-    .star-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #555; padding: 6px 8px; line-height: 1; }
+    .star-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #555; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; }
     .star-btn.active { color: #facc15; }
   </style>
 </head>
 <body>
 
-  <script src="./config.js" onerror="console.log('No external config.js detected; using fallback.')"></script>
-
   <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;">
 
-  <!-- Top Bar -->
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyWatchList</h1>
-      <span class="version-badge">v2.7</span>
+      <span class="version-badge">v2.8</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" id="btnExport">📥 Export</button>
@@ -107,14 +105,12 @@
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
     <button type="button" class="tab active" data-tab="watchlist">My Watchlist</button>
     <button type="button" class="tab" data-tab="tv">Add TV Shows</button>
     <button type="button" class="tab" data-tab="movie">Add Movies</button>
   </div>
 
-  <!-- Search Panel -->
   <div id="searchSection" style="display:none;">
     <div class="search-row">
       <input type="text" id="searchInput" placeholder="Search...">
@@ -123,7 +119,6 @@
     <div id="searchResults" class="dropdown" style="display:none;"></div>
   </div>
 
-  <!-- Watchlist Filter & Controls Panel -->
   <div id="controlsSection" class="controls-panel">
     <div class="status-pills">
       <button type="button" class="pill active" data-filter="all">All</button>
@@ -139,12 +134,12 @@
     </div>
   </div>
 
-  <!-- List Container -->
   <h3 id="listHeading" style="color:#aaa; font-size:13px; margin-bottom:8px;">Saved Items</h3>
   <div id="itemsContainer"></div>
 
   <script>
-    const ACTIVE_OMDB_KEY = (typeof OMDB_API_KEY !== 'undefined') ? OMDB_API_KEY : "YOUR_OMDB_KEY";
+    // Configuration fallback; will not halt or freeze if config.js is missing
+    const ACTIVE_OMDB_KEY = window.OMDB_API_KEY || localStorage.getItem('omdb_key') || "YOUR_OMDB_KEY";
 
     let currentTab = 'watchlist'; 
     let currentStatusFilter = 'all'; 
@@ -249,7 +244,7 @@
         heading.textContent = `My Watchlist (${itemsToRender.length}${itemsToRender.length !== watchlist.length ? ` of ${watchlist.length}` : ''})`;
 
         if (!itemsToRender.length) {
-          container.innerHTML = '<div style="color:#666; font-size:13px; padding:12px 0;">No items found matching filter.</div>';
+          container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No items found matching filter.</div>';
           return;
         }
       } else {
@@ -382,8 +377,8 @@
       }).join('');
     }
 
-    // Direct event routing
-    document.addEventListener('click', function(e) {
+    // Direct, unintercepted event handler
+    function handleActionClick(e) {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
 
@@ -395,6 +390,7 @@
         renderDisplay();
       }
       else if (action === 'toggle-season') {
+        if (e.target.closest('.bulk-btn')) return; // Ignore if user clicked the bulk watch button
         const showId = btn.getAttribute('data-show-id');
         const season = btn.getAttribute('data-season');
         const key = `${showId}_${season}`;
@@ -459,9 +455,11 @@
           save();
         }
       }
-    });
+    }
 
-    // Tab handlers
+    document.addEventListener('click', handleActionClick);
+
+    // Tab buttons
     document.querySelectorAll('.tab').forEach(tabBtn => {
       tabBtn.addEventListener('click', () => {
         currentTab = tabBtn.getAttribute('data-tab');
@@ -490,6 +488,7 @@
       });
     });
 
+    // Filter pills
     document.querySelectorAll('.status-pills .pill').forEach(pillBtn => {
       pillBtn.addEventListener('click', () => {
         currentStatusFilter = pillBtn.getAttribute('data-filter');
@@ -499,6 +498,7 @@
       });
     });
 
+    // Compact toggle
     document.getElementById('viewToggleBtn').addEventListener('click', () => {
       isCompactView = !isCompactView;
       document.getElementById('viewToggleBtn').textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
@@ -507,6 +507,7 @@
 
     document.getElementById('filterInput').addEventListener('input', renderDisplay);
 
+    // Backup & Restore
     document.getElementById('btnExport').addEventListener('click', () => {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -535,7 +536,7 @@
             save();
             alert(`Watchlist restored successfully! Loaded ${watchlist.length} items.`);
           } else {
-            alert('Invalid backup structure.');
+            alert('Invalid backup structure: expected a JSON array.');
           }
         } catch {
           alert('Could not parse JSON file.');
@@ -544,6 +545,7 @@
       reader.readAsText(file);
     });
 
+    // Search Engine
     document.getElementById('btnSearch').addEventListener('click', executeSearch);
     document.getElementById('searchInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') executeSearch();
@@ -603,14 +605,21 @@
         return;
       }
       box.innerHTML = items.slice(0, 8).map((item, index) => `
-        <div class="drop-item" onclick="addByIndex(${index})">
+        <div class="drop-item" data-action="add-search" data-index="${index}">
           <span>${escapeHtml(item.name)}</span>
           <span style="color:#4ade80; font-weight:bold;">+ Add</span>
         </div>
       `).join('');
     }
 
-    window.addByIndex = async function(index) {
+    document.addEventListener('click', function(e) {
+      const addBtn = e.target.closest('[data-action="add-search"]');
+      if (!addBtn) return;
+      const index = Number(addBtn.getAttribute('data-index'));
+      addByIndex(index);
+    });
+
+    async function addByIndex(index) {
       const item = currentSearchResults[index];
       if (!item) return;
 
@@ -672,18 +681,18 @@
       } catch {
         alert('Could not fetch details.');
       }
-    };
+    }
 
-    renderDisplay();
-
-    // Clear stale service workers to prevent cached file locks
+    // Force purge any old service workers causing script caching locks
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         for (let registration of registrations) {
-          registration.update();
+          registration.unregister();
         }
       });
     }
+
+    renderDisplay();
   </script>
 </body>
 </html>
