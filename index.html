@@ -35,7 +35,13 @@
 <body>
 
   <h1>TrackList</h1>
-  
+  <div style="display:flex; gap:8px; margin-top:16px;">
+  <button class="btn-action" onclick="exportBackup()">📥 Export Backup</button>
+  <label class="btn-action" style="cursor:pointer;">
+      📤 Import Backup
+      <input type="file" accept=".json" onchange="importBackup(event)" style="display:none;">
+    </label>
+  </div>
   <div class="tabs">
     <button class="tab active" id="tab-tv" onclick="switchMedia('tv')">TV Shows</button>
     <button class="tab" id="tab-movie" onclick="switchMedia('movie')">Movies</button>
@@ -217,8 +223,39 @@
       navigator.serviceWorker.register('./sw.js')
         .then(reg => console.log('SW Registered!', reg))
         .catch(err => console.error('SW Error:', err));
-    });
-}
+        });
+    }
+
+    // Export Watchlist as a .json file to your phone
+    function exportBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `watchlist_backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+    
+    // Restore Watchlist from a chosen .json file
+    function importBackup(event) {
+      const fileReader = new FileReader();
+      fileReader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (Array.isArray(importedData)) {
+            watchlist = importedData;
+            save();
+            alert('Watchlist restored successfully!');
+          } else {
+            alert('Invalid backup format.');
+          }
+        } catch (err) {
+          alert('Error parsing backup file.');
+        }
+      };
+      fileReader.readAsText(event.target.files[0]);
+    }
 
     renderWatchlist();
   </script>
