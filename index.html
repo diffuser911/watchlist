@@ -150,8 +150,23 @@
     let isCompactView = false;
     let currentModalShowId = null;
     let currentSearchResults = [];
-    let watchlist = JSON.parse(localStorage.getItem('tracklist_items_v2') || '[]');
-
+    let watchlist = JSON.parse(
+      localStorage.getItem('tracklist_items_v2') || 
+      localStorage.getItem('tracklist_items') || 
+      '[]'
+    );
+    
+    // Auto-fill any missing favorite flags in older backups:
+    watchlist = watchlist.map(item => {
+      if (item.type === 'tv' && item.seasons) {
+        item.seasons.forEach(s => {
+          s.episodes.forEach(ep => {
+            if (ep.favorite === undefined) ep.favorite = false;
+          });
+        });
+      }
+      return item;
+    });
     function save() {
       localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
       renderDisplay();
