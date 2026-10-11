@@ -64,12 +64,24 @@
     .compact-mode .title { font-size: 13px; margin-bottom: 0; }
 
     /* TV Episode Inline Accordion */
-    .episodes-panel { background: #161616; border-top: 1px solid #2d2d2d; padding: 12px; }
-    .season-block { margin-bottom: 16px; }
-    .season-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .season-title { color: #fbbf24; font-size: 14px; font-weight: bold; }
-    .bulk-btn { color: #94a3b8; font-size: 12px; text-decoration: underline; background: none; border: none; cursor: pointer; }
-    .episode-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #222; font-size: 13px; }
+    .episodes-panel { background: #161616; border-top: 1px solid #2d2d2d; padding: 8px 12px; }
+    .season-block { margin-bottom: 8px; border-bottom: 1px solid #222; }
+    .season-block:last-child { border-bottom: none; }
+    
+    /* Collapsible Season Header */
+    .season-header { 
+      display: flex; justify-content: space-between; align-items: center; 
+      padding: 10px 4px; cursor: pointer; user-select: none; 
+    }
+    .season-title-group { display: flex; align-items: center; gap: 6px; }
+    .season-title { color: #fbbf24; font-size: 13px; font-weight: bold; }
+    .season-indicator { font-size: 11px; color: #777; transition: transform 0.2s; }
+    .season-actions { display: flex; align-items: center; gap: 8px; }
+    .season-stats { font-size: 11px; color: #888; }
+    .bulk-btn { color: #94a3b8; font-size: 11px; text-decoration: underline; background: none; border: none; cursor: pointer; }
+    
+    .season-episodes-list { padding: 4px 0 10px 0; }
+    .episode-row { display: flex; align-items: center; padding: 7px 4px; border-bottom: 1px solid #1c1c1c; font-size: 13px; }
     .episode-checkbox { width: 26px; text-align: center; color: #888; font-weight: bold; font-size: 15px; cursor: pointer; }
     .episode-checkbox.watched { color: #4ade80; }
     .episode-label { flex: 1; margin-left: 6px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
@@ -87,8 +99,8 @@
   <!-- Top Bar -->
   <div class="top-bar">
     <div class="top-title-group">
-      <h1>TrackList</h1>
-      <span class="version-badge">v2.4</span>
+      <h1>TrackMyWatchList</h1>
+      <span class="version-badge">v2.5</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" onclick="exportBackup()">📥 Export</button>
@@ -133,17 +145,16 @@
   <div id="itemsContainer"></div>
 
   <script>
-    // Fallback if config.js wasn't found
     const ACTIVE_OMDB_KEY = (typeof OMDB_API_KEY !== 'undefined') ? OMDB_API_KEY : "YOUR_OMDB_KEY";
 
     let currentTab = 'watchlist'; 
     let currentStatusFilter = 'all'; 
     let isCompactView = false;
     let expandedShowId = null;
+    let expandedSeasons = {}; // Tracks open/closed seasons: { "showId_sNum": boolean }
     let currentSearchResults = [];
     let watchlist = [];
 
-    // Safe normalizer ensuring full schema support
     function normalizeWatchlist(items) {
       if (!Array.isArray(items)) return [];
       return items.map(item => {
@@ -400,6 +411,14 @@
       renderDisplay();
     };
 
+    // Toggle specific Season accordion
+    window.toggleSeasonAccordion = function(showId, seasonNum, event) {
+      if (event) event.stopPropagation();
+      const key = `${showId}_${seasonNum}`;
+      expandedSeasons[key] = !expandedSeasons[key];
+      renderDisplay();
+    };
+
     window.toggleEpisode = function(showId, epId) {
       watchlist = watchlist.map(item => {
         if (String(item.id) !== String(showId)) return item;
@@ -425,7 +444,8 @@
       save();
     };
 
-    window.toggleSeasonBulk = function(showId, seasonNum, markWatched) {
+    window.toggleSeasonBulk = function(showId, seasonNum, markWatched, event) {
+      if (event) event.stopPropagation();
       watchlist = watchlist.map(item => {
         if (String(item.id) !== String(showId)) return item;
         const updatedSeasons = (item.seasons || []).map(s => {
@@ -565,29 +585,49 @@
         if (isExpanded && item.seasons) {
           episodesHtml = `
             <div class="episodes-panel">
-              ${item.seasons.map(s => {
-                const allWatched = s.episodes.length > 0 && s.episodes.every(ep => ep.watched);
+              ${item.seasons.map((s, idx) => {
+                const sTotal = s.episodes.length;
+                const sWatched = s.episodes.filter(ep => ep.watched).length;
+                const allWatched = sTotal > 0 && sWatched === sTotal;
+                
+                // Keep the first unfinished season open by default, or default to false
+                const key = `${item.id}_${s.season}`;
+                if (expandedSeasons[key] === undefined) {
+                  expandedSeasons[key] = (sWatched < sTotal) && (idx === 0 || (item.seasons[idx - 1] && item.seasons[idx - 1].episodes.every(e => e.watched)));
+                }
+                const isSeasonOpen = !!expandedSeasons[key];
+
                 return `
                   <div class="season-block">
-                    <div class="season-header">
-                      <span class="season-title">Season ${s.season}</span>
-                      <button type="button" class="bulk-btn" onclick="toggleSeasonBulk('${item.id}', ${s.season},${!allWatched})">
-                        ${allWatched ? 'Unmark Season' : 'Watch Season'}
-                      </button>
-                    </div>
-                    ${s.episodes.map(ep => `
-                      <div class="episode-row">
-                        <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
-                          ${ep.watched ? '✓' : '○'}
-                        </span>
-                        <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
-                          E${ep.number || '-'}: ${escapeHtml(ep.name)}
-                        </span>
-                        <button type="button" class="star-btn ${ep.favorite ? 'active' : ''}" onclick="toggleEpisodeFavorite('${item.id}', '${ep.id}', event)">
-                          ${ep.favorite ? '★' : '☆'}
+                    <div class="season-header" onclick="toggleSeasonAccordion('${item.id}',${s.season}, event)">
+                      <div class="season-title-group">
+                        <span class="season-indicator">${isSeasonOpen ? '▼' : '▶'}</span>
+                        <span class="season-title">Season ${s.season}</span>
+                        <span class="season-stats">(${sWatched}/${sTotal})</span>
+                      </div>
+                      <div class="season-actions">
+                        <button type="button" class="bulk-btn" onclick="toggleSeasonBulk('${item.id}', ${s.season},${!allWatched}, event)">
+                          ${allWatched ? 'Unmark Season' : 'Watch Season'}
                         </button>
                       </div>
-                    `).join('')}
+                    </div>
+                    ${isSeasonOpen ? `
+                      <div class="season-episodes-list">
+                        ${s.episodes.map(ep => `
+                          <div class="episode-row">
+                            <span class="episode-checkbox ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
+                              ${ep.watched ? '✓' : '○'}
+                            </span>
+                            <span class="episode-label ${ep.watched ? 'watched' : ''}" onclick="toggleEpisode('${item.id}', '${ep.id}')">
+                              E${ep.number \vert{}\vert{} '-'}:${escapeHtml(ep.name)}
+                            </span>
+                            <button type="button" class="star-btn ${ep.favorite ? 'active' : ''}" onclick="toggleEpisodeFavorite('${item.id}', '${ep.id}', event)">
+                              ${ep.favorite ? '★' : '☆'}
+                            </button>
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
                   </div>
                 `;
               }).join('')}
@@ -654,7 +694,7 @@
               }
             } catch (err) {
               console.error(err);
-              alert('Could not parse JSON file.');
+              alert('Could not parse JSON file. Ensure it is a valid backup.');
             }
           };
           reader.readAsText(file);
