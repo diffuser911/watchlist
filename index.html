@@ -390,7 +390,6 @@
       padding: 4px 2px;
       border-bottom: 1px solid #1c1c1c;
       font-size: 13px;
-      cursor: pointer;
     }
     .episode-checkbox {
       width: 40px;
@@ -400,6 +399,7 @@
       color: #888;
       font-weight: bold;
       font-size: 18px;
+      cursor: pointer;
       user-select: none;
       flex-shrink: 0;
     }
@@ -411,6 +411,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      cursor: pointer;
       line-height: 40px;
     }
     .episode-label.watched {
@@ -439,41 +440,58 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyList</h1>
-      <span class="version-badge">v4.5</span>
+      <span class="version-badge">v5.0</span>
     </div>
     <div class="top-actions">
-      <button type="button" class="btn-action" data-action="export">📥 Export</button>
-      <button type="button" class="btn-action" data-action="import">📤 Import</button>
+      <button type="button" class="btn-action" id="btnExport">📥 Export</button>
+      <button type="button" class="btn-action" id="btnImport">📤 Import</button>
     </div>
   </div>
 
   <div class="tabs">
-    <button type="button" class="tab active" data-action="tab" data-tab="watchlist">My List</button>
-    <button type="button" class="tab" data-action="tab" data-tab="tv">Add TV</button>
-    <button type="button" class="tab" data-action="tab" data-tab="movie">Add Movie</button>
-    <button type="button" class="tab" data-action="tab" data-tab="book">Add Book</button>
+    <button type="button" class="tab active" data-tab="watchlist" id="tabWatchlist">My List</button>
+    <button type="button" class="tab" data-tab="tv" id="tabTv">Add TV</button>
+    <button type="button" class="tab" data-tab="movie" id="tabMovie">Add Movie</button>
+    <button type="button" class="tab" data-tab="book" id="tabBook">Add Book</button>
   </div>
 
   <div id="searchSection" style="display:none;">
     <div class="search-row">
       <input type="text" id="searchInput" placeholder="Search...">
-      <button type="button" class="btn-search" data-action="search-btn">Search</button>
+      <button type="button" class="btn-search" id="btnSearch">Search</button>
     </div>
     <div id="searchResults" class="dropdown" style="display:none;"></div>
   </div>
 
   <div id="controlsSection" class="controls-panel">
     <div class="media-subtabs">
-      <button type="button" class="media-tab active" data-action="media-tab" data-media="tv">📺 TV Shows</button>
-      <button type="button" class="media-tab" data-action="media-tab" data-media="movie">🎬 Movies</button>
-      <button type="button" class="media-tab" data-action="media-tab" data-media="book">📚 Books</button>
+      <button type="button" class="media-tab active" data-media="tv">📺 TV Shows</button>
+      <button type="button" class="media-tab" data-media="movie">🎬 Movies</button>
+      <button type="button" class="media-tab" data-media="book">📚 Books</button>
     </div>
 
-    <div class="status-pills" id="statusPillsContainer"></div>
+    <!-- Static status pills containers; displayed according to active media subtab -->
+    <div class="status-pills" id="pillsTv">
+      <button type="button" class="pill active" data-filter="all">All</button>
+      <button type="button" class="pill" data-filter="watching">📺 Watching</button>
+      <button type="button" class="pill" data-filter="completed">✓ Finished</button>
+      <button type="button" class="pill" data-filter="favorites">⭐ Favorites</button>
+    </div>
+    <div class="status-pills" id="pillsMovie" style="display:none;">
+      <button type="button" class="pill active" data-filter="all">All</button>
+      <button type="button" class="pill" data-filter="to_watch">🍿 To Watch</button>
+      <button type="button" class="pill" data-filter="completed">✓ Watched</button>
+    </div>
+    <div class="status-pills" id="pillsBook" style="display:none;">
+      <button type="button" class="pill active" data-filter="all">All</button>
+      <button type="button" class="pill" data-filter="reading">📖 Reading</button>
+      <button type="button" class="pill" data-filter="plan">📌 Want to Read</button>
+      <button type="button" class="pill" data-filter="completed">✓ Finished</button>
+    </div>
 
     <div class="sub-controls">
       <input type="text" id="filterInput" placeholder="Filter by title, creator, genre...">
-      <button type="button" class="view-toggle" data-action="toggle-view" id="viewToggleBtn">☰ Compact</button>
+      <button type="button" class="view-toggle" id="viewToggleBtn">☰ Compact</button>
     </div>
   </div>
 
@@ -481,6 +499,18 @@
   <div id="itemsContainer"></div>
 
   <script>
+    // 1. Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').then(function(reg) {
+          reg.update();
+        }).catch(function(err) {});
+      });
+    }
+
+    var OMDB_KEY = (typeof OMDB_API_KEY !== 'undefined') ? OMDB_API_KEY : "YOUR_OMDB_KEY";
+
+    // 2. Application State
     var currentTab = 'watchlist';
     var currentMediaSubtab = 'tv';
     var currentStatusFilter = 'all';
@@ -490,165 +520,7 @@
     var currentSearchResults = [];
     var watchlist = [];
 
-    // Native Central Event Handler: Defers heavy re-renders via setTimeout so mobile touch pipelines complete cleanly
-    document.addEventListener('click', function(e) {
-      var target = e.target.closest('[data-action]');
-      if (!target) return;
-
-      var action = target.getAttribute('data-action');
-
-      if (action === 'tab') {
-        currentTab = target.getAttribute('data-tab');
-        var allTabs = document.querySelectorAll('.tab');
-        for (var k = 0; k < allTabs.length; k++) allTabs[k].classList.remove('active');
-        target.classList.add('active');
-
-        var searchSection = document.getElementById('searchSection');
-        var controlsSection = document.getElementById('controlsSection');
-        var searchInput = document.getElementById('searchInput');
-        var resBox = document.getElementById('searchResults');
-
-        if (searchInput) searchInput.value = '';
-        if (resBox) { resBox.innerHTML = ''; resBox.style.display = 'none'; }
-        currentSearchResults = [];
-
-        if (currentTab === 'watchlist') {
-          searchSection.style.display = 'none';
-          controlsSection.style.display = 'block';
-        } else {
-          searchSection.style.display = 'block';
-          controlsSection.style.display = 'none';
-          var promptLabel = currentTab === 'tv' ? 'TV shows' : (currentTab === 'movie' ? 'movies' : 'books');
-          searchInput.placeholder = 'Search ' + promptLabel + ' online...';
-          searchInput.focus();
-        }
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'media-tab') {
-        currentMediaSubtab = target.getAttribute('data-media');
-        currentStatusFilter = 'all';
-        var allSubtabs = document.querySelectorAll('.media-tab');
-        for (var m = 0; m < allSubtabs.length; m++) allSubtabs[m].classList.remove('active');
-        target.classList.add('active');
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'filter-pill') {
-        currentStatusFilter = target.getAttribute('data-filter');
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'toggle-view') {
-        isCompactView = !isCompactView;
-        var toggleBtn = document.getElementById('viewToggleBtn');
-        if (toggleBtn) toggleBtn.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'toggle-show') {
-        var id = String(target.getAttribute('data-id'));
-        expandedShows[id] = !expandedShows[id];
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'toggle-season') {
-        if (e.target.closest('.bulk-btn')) return;
-        var showId = String(target.getAttribute('data-show'));
-        var season = target.getAttribute('data-season');
-        var sKey = showId + '_' + season;
-        expandedSeasons[sKey] = !expandedSeasons[sKey];
-        setTimeout(appRender, 0);
-      }
-      else if (action === 'toggle-ep') {
-        var showIdEp = String(target.getAttribute('data-show'));
-        var epId = String(target.getAttribute('data-ep'));
-        watchlist.forEach(function(item) {
-          if (String(item.id) === showIdEp && Array.isArray(item.seasons)) {
-            item.seasons.forEach(function(s) {
-              (s.episodes || []).forEach(function(ep) {
-                if (String(ep.id) === epId) ep.watched = !ep.watched;
-              });
-            });
-          }
-        });
-        setTimeout(appSave, 0);
-      }
-      else if (action === 'fav-ep') {
-        var showIdFav = String(target.getAttribute('data-show'));
-        var epIdFav = String(target.getAttribute('data-ep'));
-        watchlist.forEach(function(item) {
-          if (String(item.id) === showIdFav && Array.isArray(item.seasons)) {
-            item.seasons.forEach(function(s) {
-              (s.episodes || []).forEach(function(ep) {
-                if (String(ep.id) === epIdFav) ep.favorite = !ep.favorite;
-              });
-            });
-          }
-        });
-        setTimeout(appSave, 0);
-      }
-      else if (action === 'bulk-season') {
-        var showIdBulk = String(target.getAttribute('data-show'));
-        var seasonBulk = Number(target.getAttribute('data-season'));
-        var markWatched = target.getAttribute('data-mark') === 'true';
-        watchlist.forEach(function(item) {
-          if (String(item.id) === showIdBulk && Array.isArray(item.seasons)) {
-            item.seasons.forEach(function(s) {
-              if (s.season === seasonBulk) {
-                (s.episodes || []).forEach(function(ep) { ep.watched = markWatched; });
-              }
-            });
-          }
-        });
-        setTimeout(appSave, 0);
-      }
-      else if (action === 'toggle-movie') {
-        var mId = String(target.getAttribute('data-id'));
-        watchlist.forEach(function(item) {
-          if (String(item.id) === mId) item.watched = !item.watched;
-        });
-        setTimeout(appSave, 0);
-      }
-      else if (action === 'cycle-book') {
-        var bId = String(target.getAttribute('data-id'));
-        watchlist.forEach(function(item) {
-          if (String(item.id) === bId) {
-            if (item.bookStatus === 'plan') item.bookStatus = 'reading';
-            else if (item.bookStatus === 'reading') item.bookStatus = 'completed';
-            else item.bookStatus = 'plan';
-          }
-        });
-        setTimeout(appSave, 0);
-      }
-      else if (action === 'delete') {
-        var dId = String(target.getAttribute('data-id'));
-        if (confirm('Remove this title from your list?')) {
-          watchlist = watchlist.filter(function(w) { return String(w.id) !== dId; });
-          setTimeout(appSave, 0);
-        }
-      }
-      else if (action === 'add-result') {
-        var rIdx = Number(target.getAttribute('data-idx'));
-        addByIndex(rIdx);
-      }
-      else if (action === 'export') {
-        var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
-        var a = document.createElement('a');
-        a.setAttribute("href", dataStr);
-        a.setAttribute("download", "watchlist_backup_" + new Date().toISOString().slice(0,10) + ".json");
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-      else if (action === 'import') {
-        var fileInput = document.getElementById('importFileInput');
-        if (fileInput) {
-          fileInput.value = '';
-          fileInput.click();
-        }
-      }
-      else if (action === 'search-btn') {
-        executeSearch();
-      }
-    });
-
-    // 2. Backward-compatible data normalizer
+    // Robust backward-compatible normalizer
     function normalizeWatchlist(items) {
       if (!Array.isArray(items)) return [];
       return items.map(function(item) {
@@ -675,8 +547,7 @@
 
         if (norm.type === 'tv' && Array.isArray(item.seasons)) {
           norm.seasons = item.seasons.map(function(s) {
-            var rawEps = Array.isArray(s.episodes) ? s.episodes : [];
-            var episodes = rawEps.map(function(ep) {
+            var episodes = Array.isArray(s.episodes) ? s.episodes.map(function(ep) {
               return {
                 id: String(ep.id || Math.random()),
                 name: ep.name || '',
@@ -686,7 +557,7 @@
                 watched: ep.watched === true,
                 favorite: ep.favorite === true
               };
-            });
+            }) : [];
 
             var detectedYear = s.year ? String(s.year) : '';
             if (!detectedYear && episodes.length > 0 && episodes[0].airdate && episodes[0].airdate.length >= 4) {
@@ -714,7 +585,9 @@
     function appSave() {
       try {
         localStorage.setItem('tracklist_items_v2', JSON.stringify(watchlist));
-      } catch (e) {}
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
       appRender();
     }
 
@@ -732,296 +605,444 @@
       var total = 0, watched = 0, favorites = 0;
       if (!Array.isArray(seasons)) return { total: 0, watched: 0, favorites: 0, pct: 0 };
       seasons.forEach(function(s) {
-        (s.episodes || []).forEach(function(ep) {
-          total++;
-          if (ep.watched) watched++;
-          if (ep.favorite) favorites++;
-        });
+        if (Array.isArray(s.episodes)) {
+          s.episodes.forEach(function(ep) {
+            total++;
+            if (ep.watched) watched++;
+            if (ep.favorite) favorites++;
+          });
+        }
       });
       return { total: total, watched: watched, favorites: favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
     }
 
-    function renderStatusPills() {
-      var container = document.getElementById('statusPillsContainer');
-      if (!container) return;
+    function syncPillsVisibility() {
+      var pTv = document.getElementById('pillsTv');
+      var pMovie = document.getElementById('pillsMovie');
+      var pBook = document.getElementById('pillsBook');
+      if (!pTv || !pMovie || !pBook) return;
 
-      var pills = [];
-      if (currentMediaSubtab === 'tv') {
-        pills = [
-          { id: 'all', label: 'All' },
-          { id: 'watching', label: '📺 Watching' },
-          { id: 'completed', label: '✓ Finished' },
-          { id: 'favorites', label: '⭐ Favorites' }
-        ];
-      } else if (currentMediaSubtab === 'movie') {
-        pills = [
-          { id: 'all', label: 'All' },
-          { id: 'to_watch', label: '🍿 To Watch' },
-          { id: 'completed', label: '✓ Watched' }
-        ];
-      } else if (currentMediaSubtab === 'book') {
-        pills = [
-          { id: 'all', label: 'All' },
-          { id: 'reading', label: '📖 Reading' },
-          { id: 'plan', label: '📌 Want to Read' },
-          { id: 'completed', label: '✓ Finished' }
-        ];
-      }
+      pTv.style.display = currentMediaSubtab === 'tv' ? 'flex' : 'none';
+      pMovie.style.display = currentMediaSubtab === 'movie' ? 'flex' : 'none';
+      pBook.style.display = currentMediaSubtab === 'book' ? 'flex' : 'none';
 
-      var html = '';
+      // Update active pill styling within current visible group
+      var activeGroup = currentMediaSubtab === 'tv' ? pTv : (currentMediaSubtab === 'movie' ? pMovie : pBook);
+      var pills = activeGroup.querySelectorAll('.pill');
       for (var i = 0; i < pills.length; i++) {
-        var p = pills[i];
-        var activeClass = (p.id === currentStatusFilter) ? 'active' : '';
-        html += '<button type="button" class="pill ' + activeClass + '" data-action="filter-pill" data-filter="' + p.id + '">' + p.label + '</button>';
+        if (pills[i].getAttribute('data-filter') === currentStatusFilter) {
+          pills[i].classList.add('active');
+        } else {
+          pills[i].classList.remove('active');
+        }
       }
-      container.innerHTML = html;
     }
 
+    // 3. Render Engine
     function appRender() {
-      try {
-        renderStatusPills();
-        var container = document.getElementById('itemsContainer');
-        var heading = document.getElementById('listHeading');
-        if (!container || !heading) return;
+      syncPillsVisibility();
+      var container = document.getElementById('itemsContainer');
+      var heading = document.getElementById('listHeading');
+      if (!container || !heading) return;
 
-        var itemsToRender = [];
+      var itemsToRender = [];
 
-        if (currentTab === 'watchlist') {
-          var filter = (document.getElementById('filterInput') ? document.getElementById('filterInput').value : '').toLowerCase().trim();
-          
-          itemsToRender = watchlist.filter(function(item) {
-            if (item.type !== currentMediaSubtab) return false;
+      if (currentTab === 'watchlist') {
+        var filter = (document.getElementById('filterInput') ? document.getElementById('filterInput').value : '').toLowerCase().trim();
+        
+        itemsToRender = watchlist.filter(function(item) {
+          if (item.type !== currentMediaSubtab) return false;
 
-            if (currentMediaSubtab === 'tv') {
-              var st = getStats(item.seasons);
-              if (currentStatusFilter === 'watching' && st.watched >= st.total) return false;
-              if (currentStatusFilter === 'completed' && (st.total === 0 || st.watched < st.total)) return false;
-              if (currentStatusFilter === 'favorites' && st.favorites === 0) return false;
-            } else if (currentMediaSubtab === 'movie') {
-              if (currentStatusFilter === 'to_watch' && item.watched) return false;
-              if (currentStatusFilter === 'completed' && !item.watched) return false;
-            } else if (currentMediaSubtab === 'book') {
-              if (currentStatusFilter === 'reading' && item.bookStatus !== 'reading') return false;
-              if (currentStatusFilter === 'plan' && item.bookStatus !== 'plan') return false;
-              if (currentStatusFilter === 'completed' && item.bookStatus !== 'completed') return false;
-            }
-
-            if (!filter) return true;
-            var matchName = item.name && item.name.toLowerCase().indexOf(filter) !== -1;
-            return matchName ||
-                   (item.director && item.director.toLowerCase().indexOf(filter) !== -1) ||
-                   (item.author && item.author.toLowerCase().indexOf(filter) !== -1) ||
-                   (item.actors && item.actors.toLowerCase().indexOf(filter) !== -1) ||
-                   (Array.isArray(item.genres) && item.genres.some(function(g) { return g.toLowerCase().indexOf(filter) !== -1; }));
-          });
-
-          var mediaLabel = currentMediaSubtab === 'tv' ? 'TV Shows' : (currentMediaSubtab === 'movie' ? 'Movies' : 'Books');
-          heading.style.display = 'block';
-          heading.textContent = mediaLabel + ' (' + itemsToRender.length + ')';
-
-          if (!itemsToRender.length) {
-            container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No ' + mediaLabel.toLowerCase() + ' found in this view.</div>';
-            return;
-          }
-        } else {
-          var searchQuery = (document.getElementById('searchInput') ? document.getElementById('searchInput').value : '').toLowerCase().trim();
-          if (!searchQuery || searchQuery.length < 2) {
-            heading.style.display = 'none';
-            container.innerHTML = '';
-            return;
+          if (currentMediaSubtab === 'tv') {
+            var st = getStats(item.seasons);
+            if (currentStatusFilter === 'watching' && st.watched >= st.total) return false;
+            if (currentStatusFilter === 'completed' && (st.total === 0 || st.watched < st.total)) return false;
+            if (currentStatusFilter === 'favorites' && st.favorites === 0) return false;
+          } else if (currentMediaSubtab === 'movie') {
+            if (currentStatusFilter === 'to_watch' && item.watched) return false;
+            if (currentStatusFilter === 'completed' && !item.watched) return false;
+          } else if (currentMediaSubtab === 'book') {
+            if (currentStatusFilter === 'reading' && item.bookStatus !== 'reading') return false;
+            if (currentStatusFilter === 'plan' && item.bookStatus !== 'plan') return false;
+            if (currentStatusFilter === 'completed' && item.bookStatus !== 'completed') return false;
           }
 
-          itemsToRender = watchlist.filter(function(item) {
-            return item.type === currentTab && item.name && item.name.toLowerCase().indexOf(searchQuery) !== -1;
-          });
+          if (!filter) return true;
+          var matchName = item.name && item.name.toLowerCase().indexOf(filter) !== -1;
+          return matchName ||
+                 (item.director && item.director.toLowerCase().indexOf(filter) !== -1) ||
+                 (item.author && item.author.toLowerCase().indexOf(filter) !== -1) ||
+                 (item.actors && item.actors.toLowerCase().indexOf(filter) !== -1) ||
+                 (Array.isArray(item.genres) && item.genres.some(function(g) { return g.toLowerCase().indexOf(filter) !== -1; }));
+        });
 
-          if (!itemsToRender.length) {
-            heading.style.display = 'none';
-            container.innerHTML = '';
-            return;
-          }
+        var mediaLabel = currentMediaSubtab === 'tv' ? 'TV Shows' : (currentMediaSubtab === 'movie' ? 'Movies' : 'Books');
+        heading.style.display = 'block';
+        heading.textContent = mediaLabel + ' (' + itemsToRender.length + ')';
 
-          heading.style.display = 'block';
-          heading.textContent = 'Already in List (' + itemsToRender.length + ')';
+        if (!itemsToRender.length) {
+          container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No ' + mediaLabel.toLowerCase() + ' found in this view.</div>';
+          return;
+        }
+      } else {
+        var searchQuery = (document.getElementById('searchInput') ? document.getElementById('searchInput').value : '').toLowerCase().trim();
+        if (!searchQuery || searchQuery.length < 2) {
+          heading.style.display = 'none';
+          container.innerHTML = '';
+          return;
         }
 
-        container.className = isCompactView ? 'compact-mode' : '';
+        itemsToRender = watchlist.filter(function(item) {
+          return item.type === currentTab && item.name && item.name.toLowerCase().indexOf(searchQuery) !== -1;
+        });
 
-        var html = '';
-        for (var i = 0; i < itemsToRender.length; i++) {
-          var item = itemsToRender[i];
-          var sId = String(item.id);
+        if (!itemsToRender.length) {
+          heading.style.display = 'none';
+          container.innerHTML = '';
+          return;
+        }
 
-          if (item.type === 'movie') {
-            html += '<div class="card-container">' +
-              '<div class="card-main">' +
-                (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
-                '<div class="info">' +
-                  '<div class="title">' + escapeHtml(item.name) + ' <span style="color:#888; font-size:12px;">(' + escapeHtml(item.year) + ')</span></div>' +
-                  '<div class="tags">' + (item.genres || []).map(function(g) { return '<span class="tag">' + escapeHtml(g) + '</span>'; }).join('') + '</div>' +
-                  '<div class="sub">Dir: ' + escapeHtml(item.director) + '</div>' +
-                  '<div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ' + escapeHtml(item.actors) + '</div>' +
-                  '<button type="button" class="btn-action ' + (item.watched ? 'btn-watched' : '') + '" data-action="toggle-movie" data-id="' + sId + '">' +
-                    (item.watched ? '✓ Watched' : '○ Mark as Watched') +
-                  '</button>' +
-                '</div>' +
-                '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+        heading.style.display = 'block';
+        heading.textContent = 'Already in List (' + itemsToRender.length + ')';
+      }
+
+      container.className = isCompactView ? 'compact-mode' : '';
+
+      var html = '';
+      for (var i = 0; i < itemsToRender.length; i++) {
+        var item = itemsToRender[i];
+        var sId = String(item.id);
+
+        if (item.type === 'movie') {
+          html += '<div class="card-container">' +
+            '<div class="card-main">' +
+              (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
+              '<div class="info">' +
+                '<div class="title">' + escapeHtml(item.name) + ' <span style="color:#888; font-size:12px;">(' + escapeHtml(item.year) + ')</span></div>' +
+                '<div class="tags">' + (item.genres || []).map(function(g) { return '<span class="tag">' + escapeHtml(g) + '</span>'; }).join('') + '</div>' +
+                '<div class="sub">Dir: ' + escapeHtml(item.director) + '</div>' +
+                '<div class="sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cast: ' + escapeHtml(item.actors) + '</div>' +
+                '<button type="button" class="btn-action ' + (item.watched ? 'btn-watched' : '') + '" data-action="toggle-movie" data-id="' + sId + '">' +
+                  (item.watched ? '✓ Watched' : '○ Mark as Watched') +
+                '</button>' +
               '</div>' +
-            '</div>';
-          } else if (item.type === 'book') {
-            var statusClass = item.bookStatus === 'completed' ? 'btn-watched' : (item.bookStatus === 'reading' ? 'btn-reading' : 'btn-plan');
-            var statusText = item.bookStatus === 'completed' ? '✓ Finished' : (item.bookStatus === 'reading' ? '📖 Reading' : '📌 Want to Read');
+              '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+            '</div>' +
+          '</div>';
+        } else if (item.type === 'book') {
+          var statusClass = item.bookStatus === 'completed' ? 'btn-watched' : (item.bookStatus === 'reading' ? 'btn-reading' : 'btn-plan');
+          var statusText = item.bookStatus === 'completed' ? '✓ Finished' : (item.bookStatus === 'reading' ? '📖 Reading' : '📌 Want to Read');
 
-            html += '<div class="card-container">' +
-              '<div class="card-main">' +
-                (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
-                '<div class="info">' +
-                  '<div class="title">' + escapeHtml(item.name) + ' <span style="color:#888; font-size:12px;">(' + escapeHtml(item.year) + ')</span></div>' +
-                  '<div class="sub" style="color:#38bdf8;">Author: ' + escapeHtml(item.author || 'Unknown') + '</div>' +
-                  '<button type="button" class="btn-action ' + statusClass + '" data-action="cycle-book" data-id="' + sId + '">' +
-                    statusText + ' ▾' +
-                  '</button>' +
-                '</div>' +
-                '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+          html += '<div class="card-container">' +
+            '<div class="card-main">' +
+              (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
+              '<div class="info">' +
+                '<div class="title">' + escapeHtml(item.name) + ' <span style="color:#888; font-size:12px;">(' + escapeHtml(item.year) + ')</span></div>' +
+                '<div class="sub" style="color:#38bdf8;">Author: ' + escapeHtml(item.author || 'Unknown') + '</div>' +
+                '<button type="button" class="btn-action ' + statusClass + '" data-action="cycle-book" data-id="' + sId + '">' +
+                  statusText + ' ▾' +
+                '</button>' +
               '</div>' +
-            '</div>';
-          } else {
-            var stats = getStats(item.seasons);
-            var isShowExpanded = Boolean(expandedShows[sId]);
+              '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+            '</div>' +
+          '</div>';
+        } else {
+          var stats = getStats(item.seasons);
+          var isShowExpanded = Boolean(expandedShows[sId]);
 
-            var calLink = '';
-            if (item.nextAirStamp) {
-              var d = new Date(item.nextAirStamp);
-              var iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-              calLink = '<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('New ' + item.name + ' Episode') + '&dates=' + iso + '/' + iso + '&details=' + encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>';
-            }
+          var calLink = '';
+          if (item.nextAirStamp) {
+            var d = new Date(item.nextAirStamp);
+            var iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            calLink = '<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('New ' + item.name + ' Episode') + '&dates=' + iso + '/' + iso + '&details=' + encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>';
+          }
 
-            var episodesHtml = '';
-            if (isShowExpanded && Array.isArray(item.seasons)) {
-              episodesHtml += '<div class="episodes-panel">';
-              for (var sIdx = 0; sIdx < item.seasons.length; sIdx++) {
-                var s = item.seasons[sIdx];
-                var sEps = Array.isArray(s.episodes) ? s.episodes : [];
-                var sTotal = sEps.length;
-                var sWatched = 0;
-                for (var epK = 0; epK < sEps.length; epK++) {
-                  if (sEps[epK].watched) sWatched++;
+          var episodesHtml = '';
+          if (isShowExpanded && Array.isArray(item.seasons)) {
+            episodesHtml += '<div class="episodes-panel">';
+            for (var sIdx = 0; sIdx < item.seasons.length; sIdx++) {
+              var s = item.seasons[sIdx];
+              var sEps = Array.isArray(s.episodes) ? s.episodes : [];
+              var sTotal = sEps.length;
+              var sWatched = 0;
+              for (var epK = 0; epK < sEps.length; epK++) {
+                if (sEps[epK].watched) sWatched++;
+              }
+              var allWatched = sTotal > 0 && sWatched === sTotal;
+
+              var sYear = s.year || (sEps[0] && sEps[0].airdate ? sEps[0].airdate.slice(0, 4) : '');
+              var yearLabel = sYear ? ' <span style="color:#888; font-size:12px; font-weight:normal;">(' + escapeHtml(sYear) + ')</span>' : '';
+
+              var key = sId + '_' + s.season;
+              if (expandedSeasons[key] === undefined) {
+                var prevSeasonDone = false;
+                if (sIdx > 0 && item.seasons[sIdx - 1] && Array.isArray(item.seasons[sIdx - 1].episodes)) {
+                  var prevEps = item.seasons[sIdx - 1].episodes;
+                  prevSeasonDone = prevEps.length > 0 && prevEps.every(function(e) { return e.watched; });
                 }
-                var allWatched = sTotal > 0 && sWatched === sTotal;
+                expandedSeasons[key] = (sWatched < sTotal) && (sIdx === 0 || prevSeasonDone);
+              }
+              var isSeasonOpen = Boolean(expandedSeasons[key]);
 
-                var sYear = s.year || (sEps[0] && sEps[0].airdate ? sEps[0].airdate.slice(0, 4) : '');
-                var yearLabel = sYear ? ' <span style="color:#888; font-size:12px; font-weight:normal;">(' + escapeHtml(sYear) + ')</span>' : '';
+              episodesHtml += '<div class="season-block">' +
+                '<div class="season-header" data-action="toggle-season" data-show="' + sId + '" data-season="' + s.season + '">' +
+                  '<div class="season-title-group" style="pointer-events:none;">' +
+                    '<span class="season-indicator">' + (isSeasonOpen ? '▼' : '▶') + '</span>' +
+                    '<span class="season-title">Season ' + s.season + yearLabel + '</span>' +
+                    '<span class="season-stats">(' + sWatched + '/' + sTotal + ')</span>' +
+                  '</div>' +
+                  '<button type="button" class="bulk-btn" data-action="bulk-season" data-show="' + sId + '" data-season="' + s.season + '" data-mark="' + (!allWatched) + '">' +
+                    (allWatched ? 'Unmark Season' : 'Watch Season') +
+                  '</button>' +
+                '</div>';
 
-                var key = sId + '_' + s.season;
-                if (expandedSeasons[key] === undefined) {
-                  var prevSeasonDone = false;
-                  if (sIdx > 0 && item.seasons[sIdx - 1] && Array.isArray(item.seasons[sIdx - 1].episodes)) {
-                    var prevEps = item.seasons[sIdx - 1].episodes;
-                    prevSeasonDone = prevEps.length > 0 && prevEps.every(function(e) { return e.watched; });
-                  }
-                  expandedSeasons[key] = (sWatched < sTotal) && (sIdx === 0 || prevSeasonDone);
-                }
-                var isSeasonOpen = Boolean(expandedSeasons[key]);
-
-                episodesHtml += '<div class="season-block">' +
-                  '<div class="season-header" data-action="toggle-season" data-show="' + sId + '" data-season="' + s.season + '">' +
-                    '<div class="season-title-group" style="pointer-events:none;">' +
-                      '<span class="season-indicator">' + (isSeasonOpen ? '▼' : '▶') + '</span>' +
-                      '<span class="season-title">Season ' + s.season + yearLabel + '</span>' +
-                      '<span class="season-stats">(' + sWatched + '/' + sTotal + ')</span>' +
-                    '</div>' +
-                    '<button type="button" class="bulk-btn" data-action="bulk-season" data-show="' + sId + '" data-season="' + s.season + '" data-mark="' + (!allWatched) + '">' +
-                      (allWatched ? 'Unmark Season' : 'Watch Season') +
+              if (isSeasonOpen && sEps.length > 0) {
+                episodesHtml += '<div class="season-episodes-list">';
+                for (var epIdx = 0; epIdx < sEps.length; epIdx++) {
+                  var ep = sEps[epIdx];
+                  episodesHtml += '<div class="episode-row">' +
+                    '<span class="episode-checkbox ' + (ep.watched ? 'watched' : '') + '" data-action="toggle-ep" data-show="' + sId + '" data-ep="' + ep.id + '">' +
+                      (ep.watched ? '✓' : '○') +
+                    '</span>' +
+                    '<span class="episode-label ' + (ep.watched ? 'watched' : '') + '" data-action="toggle-ep" data-show="' + sId + '" data-ep="' + ep.id + '">' +
+                      'E' + (ep.number || '-') + ': ' + escapeHtml(ep.name) +
+                    '</span>' +
+                    '<button type="button" class="star-btn ' + (ep.favorite ? 'active' : '') + '" data-action="fav-ep" data-show="' + sId + '" data-ep="' + ep.id + '">' +
+                      (ep.favorite ? '★' : '☆') +
                     '</button>' +
                   '</div>';
-
-                if (isSeasonOpen && sEps.length > 0) {
-                  episodesHtml += '<div class="season-episodes-list">';
-                  for (var epIdx = 0; epIdx < sEps.length; epIdx++) {
-                    var ep = sEps[epIdx];
-                    episodesHtml += '<div class="episode-row" data-action="toggle-ep" data-show="' + sId + '" data-ep="' + ep.id + '">' +
-                      '<span class="episode-checkbox ' + (ep.watched ? 'watched' : '') + '">' +
-                        (ep.watched ? '✓' : '○') +
-                      '</span>' +
-                      '<span class="episode-label ' + (ep.watched ? 'watched' : '') + '">' +
-                        'E' + (ep.number || '-') + ': ' + escapeHtml(ep.name) +
-                      '</span>' +
-                      '<button type="button" class="star-btn ' + (ep.favorite ? 'active' : '') + '" data-action="fav-ep" data-show="' + sId + '" data-ep="' + ep.id + '">' +
-                        (ep.favorite ? '★' : '☆') +
-                      '</button>' +
-                    '</div>';
-                  }
-                  episodesHtml += '</div>';
                 }
                 episodesHtml += '</div>';
               }
               episodesHtml += '</div>';
             }
+            episodesHtml += '</div>';
+          }
 
-            html += '<div class="card-container">' +
-              '<div class="card-main">' +
-                (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
-                '<div class="info">' +
-                  '<div class="title">' + escapeHtml(item.name) + '</div>' +
-                  '<div class="sub" style="color:#38bdf8;">Next Air: ' + escapeHtml(item.nextAirDate) + '</div>' +
-                  '<div class="progress-text">' +
-                    stats.watched + ' / ' + stats.total + ' eps (' + stats.pct + '%) ' +
-                    (stats.favorites > 0 ? '· <span style="color:#facc15;">★ ' + stats.favorites + '</span>' : '') +
-                  '</div>' +
-                  '<button type="button" class="btn-expand" data-action="toggle-show" data-id="' + sId + '">' +
-                    (isShowExpanded ? '▲ Hide Episodes' : '▼ View Episodes') +
-                  '</button>' +
-                  calLink +
+          html += '<div class="card-container">' +
+            '<div class="card-main">' +
+              (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
+              '<div class="info">' +
+                '<div class="title">' + escapeHtml(item.name) + '</div>' +
+                '<div class="sub" style="color:#38bdf8;">Next Air: ' + escapeHtml(item.nextAirDate) + '</div>' +
+                '<div class="progress-text">' +
+                  stats.watched + ' / ' + stats.total + ' eps (' + stats.pct + '%) ' +
+                  (stats.favorites > 0 ? '· <span style="color:#facc15;">★ ' + stats.favorites + '</span>' : '') +
                 '</div>' +
-                '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+                '<button type="button" class="btn-expand" data-action="toggle-show" data-id="' + sId + '">' +
+                  (isShowExpanded ? '▲ Hide Episodes' : '▼ View Episodes') +
+                '</button>' +
+                calLink +
               '</div>' +
-              episodesHtml +
-            '</div>';
-          }
+              '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+            '</div>' +
+            episodesHtml +
+          '</div>';
         }
-        container.innerHTML = html;
-      } catch (err) {
-        console.error("Critical Render Error:", err);
       }
+      container.innerHTML = html;
     }
 
-    var filterInputElem = document.getElementById('filterInput');
-    if (filterInputElem) {
-      filterInputElem.addEventListener('input', function() {
-        setTimeout(appRender, 0);
-      });
-    }
+    // 4. Centralized Event Delegation (Only for internal card actions)
+    document.addEventListener('click', function(e) {
+      var target = e.target.closest('[data-action]');
+      if (!target) return;
 
-    var importFileElem = document.getElementById('importFileInput');
-    if (importFileElem) {
-      importFileElem.addEventListener('change', function(e) {
-        var file = e.target.files && e.target.files[0];
-        if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(evt) {
-          try {
-            var parsed = JSON.parse(evt.target.result);
-            if (Array.isArray(parsed)) {
-              watchlist = normalizeWatchlist(parsed);
-              appSave();
-              alert('Watchlist restored successfully! Loaded ' + watchlist.length + ' titles.');
-            } else {
-              alert('Invalid backup structure: expected a JSON array.');
-            }
-          } catch (err) {
-            alert('Could not parse JSON file.');
+      var action = target.getAttribute('data-action');
+
+      if (action === 'toggle-show') {
+        var id = String(target.getAttribute('data-id'));
+        expandedShows[id] = !expandedShows[id];
+        appRender();
+      }
+      else if (action === 'toggle-season') {
+        if (e.target.closest('.bulk-btn')) return;
+        var showId = String(target.getAttribute('data-show'));
+        var season = target.getAttribute('data-season');
+        var sKey = showId + '_' + season;
+        expandedSeasons[sKey] = !expandedSeasons[sKey];
+        appRender();
+      }
+      else if (action === 'toggle-ep') {
+        var showIdEp = String(target.getAttribute('data-show'));
+        var epId = String(target.getAttribute('data-ep'));
+        watchlist.forEach(function(item) {
+          if (String(item.id) === showIdEp && Array.isArray(item.seasons)) {
+            item.seasons.forEach(function(s) {
+              (s.episodes || []).forEach(function(ep) {
+                if (String(ep.id) === epId) ep.watched = !ep.watched;
+              });
+            });
           }
-        };
-        reader.readAsText(file);
+        });
+        appSave();
+      }
+      else if (action === 'fav-ep') {
+        var showIdFav = String(target.getAttribute('data-show'));
+        var epIdFav = String(target.getAttribute('data-ep'));
+        watchlist.forEach(function(item) {
+          if (String(item.id) === showIdFav && Array.isArray(item.seasons)) {
+            item.seasons.forEach(function(s) {
+              (s.episodes || []).forEach(function(ep) {
+                if (String(ep.id) === epIdFav) ep.favorite = !ep.favorite;
+              });
+            });
+          }
+        });
+        appSave();
+      }
+      else if (action === 'bulk-season') {
+        var showIdBulk = String(target.getAttribute('data-show'));
+        var seasonBulk = Number(target.getAttribute('data-season'));
+        var markWatched = target.getAttribute('data-mark') === 'true';
+        watchlist.forEach(function(item) {
+          if (String(item.id) === showIdBulk && Array.isArray(item.seasons)) {
+            item.seasons.forEach(function(s) {
+              if (s.season === seasonBulk) {
+                (s.episodes || []).forEach(function(ep) { ep.watched = markWatched; });
+              }
+            });
+          }
+        });
+        appSave();
+      }
+      else if (action === 'toggle-movie') {
+        var mId = String(target.getAttribute('data-id'));
+        watchlist.forEach(function(item) {
+          if (String(item.id) === mId) item.watched = !item.watched;
+        });
+        appSave();
+      }
+      else if (action === 'cycle-book') {
+        var bId = String(target.getAttribute('data-id'));
+        watchlist.forEach(function(item) {
+          if (String(item.id) === bId) {
+            if (item.bookStatus === 'plan') item.bookStatus = 'reading';
+            else if (item.bookStatus === 'reading') item.bookStatus = 'completed';
+            else item.bookStatus = 'plan';
+          }
+        });
+        appSave();
+      }
+      else if (action === 'delete') {
+        var dId = String(target.getAttribute('data-id'));
+        if (confirm('Remove this title from your list?')) {
+          watchlist = watchlist.filter(function(w) { return String(w.id) !== dId; });
+          appSave();
+        }
+      }
+      else if (action === 'add-result') {
+        var rIdx = Number(target.getAttribute('data-idx'));
+        addByIndex(rIdx);
+      }
+    });
+
+    // 5. Dedicated Listeners for Top Navigation (Direct, exact matching from v3.7)
+    var tabBtns = document.querySelectorAll('.tab');
+    for (var tI = 0; tI < tabBtns.length; tI++) {
+      tabBtns[tI].addEventListener('click', function(e) {
+        currentTab = this.getAttribute('data-tab');
+        for (var k = 0; k < tabBtns.length; k++) tabBtns[k].classList.remove('active');
+        this.classList.add('active');
+
+        var searchSection = document.getElementById('searchSection');
+        var controlsSection = document.getElementById('controlsSection');
+        var searchInput = document.getElementById('searchInput');
+        var resBox = document.getElementById('searchResults');
+
+        if (searchInput) searchInput.value = '';
+        if (resBox) { resBox.innerHTML = ''; resBox.style.display = 'none'; }
+        currentSearchResults = [];
+
+        if (currentTab === 'watchlist') {
+          searchSection.style.display = 'none';
+          controlsSection.style.display = 'block';
+        } else {
+          searchSection.style.display = 'block';
+          controlsSection.style.display = 'none';
+          var promptLabel = currentTab === 'tv' ? 'TV shows' : (currentTab === 'movie' ? 'movies' : 'books');
+          searchInput.placeholder = 'Search ' + promptLabel + ' online...';
+          searchInput.focus();
+        }
+        appRender();
       });
     }
 
-    var searchInputElem = document.getElementById('searchInput');
-    if (searchInputElem) {
-      searchInputElem.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') executeSearch();
+    // Media sub-tabs
+    var mediaTabs = document.querySelectorAll('.media-tab');
+    for (var mI = 0; mI < mediaTabs.length; mI++) {
+      mediaTabs[mI].addEventListener('click', function() {
+        currentMediaSubtab = this.getAttribute('data-media');
+        currentStatusFilter = 'all';
+        for (var k = 0; k < mediaTabs.length; k++) mediaTabs[k].classList.remove('active');
+        this.classList.add('active');
+        appRender();
       });
     }
+
+    // Static Status Pills delegation
+    var pillContainers = document.querySelectorAll('.status-pills');
+    for (var pcI = 0; pcI < pillContainers.length; pcI++) {
+      pillContainers[pcI].addEventListener('click', function(e) {
+        var pill = e.target.closest('.pill');
+        if (!pill) return;
+        currentStatusFilter = pill.getAttribute('data-filter');
+        appRender();
+      });
+    }
+
+    // Compact View Toggle
+    document.getElementById('viewToggleBtn').addEventListener('click', function() {
+      isCompactView = !isCompactView;
+      this.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
+      appRender();
+    });
+
+    document.getElementById('filterInput').addEventListener('input', appRender);
+
+    // Export & Import
+    document.getElementById('btnExport').addEventListener('click', function() {
+      var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
+      var a = document.createElement('a');
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", "watchlist_backup_" + new Date().toISOString().slice(0,10) + ".json");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    document.getElementById('btnImport').addEventListener('click', function() {
+      var fileInput = document.getElementById('importFileInput');
+      fileInput.value = '';
+      fileInput.click();
+    });
+
+    document.getElementById('importFileInput').addEventListener('change', function(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          var parsed = JSON.parse(evt.target.result);
+          if (Array.isArray(parsed)) {
+            watchlist = normalizeWatchlist(parsed);
+            appSave();
+            alert('Watchlist restored successfully! Loaded ' + watchlist.length + ' titles.');
+          } else {
+            alert('Invalid backup structure: expected a JSON array.');
+          }
+        } catch (err) {
+          alert('Could not parse JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Search Engine
+    document.getElementById('btnSearch').addEventListener('click', executeSearch);
+    document.getElementById('searchInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') executeSearch();
+    });
 
     async function executeSearch() {
       var q = (document.getElementById('searchInput') ? document.getElementById('searchInput').value : '').trim();
@@ -1123,7 +1144,7 @@
       } catch (err) {
         resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network.</div>';
       }
-      setTimeout(appRender, 0);
+      appRender();
     }
 
     function renderDropdown(items) {
@@ -1225,7 +1246,7 @@
 
         var allTabs = document.querySelectorAll('.tab');
         for (var k = 0; k < allTabs.length; k++) allTabs[k].classList.remove('active');
-        var defaultTab = document.querySelector('.tab[data-tab="watchlist"]');
+        var defaultTab = document.getElementById('tabWatchlist');
         if (defaultTab) defaultTab.classList.add('active');
 
         var allMediaTabs = document.querySelectorAll('.media-tab');
@@ -1238,14 +1259,14 @@
         if (searchSection) searchSection.style.display = 'none';
         if (controlsSection) controlsSection.style.display = 'block';
 
-        setTimeout(appRender, 0);
+        appRender();
       } catch (e) {
         alert('Could not fetch details.');
       }
     }
 
-    // Initial load
-    setTimeout(appRender, 0);
+    // Initial mount
+    appRender();
   </script>
 </body>
 </html>
