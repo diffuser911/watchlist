@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>TrackMyWatchList</title>
+  <title>TrackMyList</title>
   <meta name="theme-color" content="#121212">
   <link rel="manifest" href="./manifest.json">
   <script src="./config.js"></script>
@@ -76,6 +76,16 @@
       color: #4ade80 !important;
       border-color: #15803d !important;
     }
+    .btn-reading {
+      background: #0369a1 !important;
+      color: #38bdf8 !important;
+      border-color: #0284c7 !important;
+    }
+    .btn-plan {
+      background: #713f12 !important;
+      color: #fde047 !important;
+      border-color: #a16207 !important;
+    }
 
     /* Tabs */
     .tabs {
@@ -99,6 +109,32 @@
     }
     .tab.active {
       background: #333;
+      color: #fff;
+    }
+
+    /* Media Sub-Tabs (Inside My List) */
+    .media-subtabs {
+      display: flex;
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 3px;
+      margin-bottom: 10px;
+      gap: 4px;
+    }
+    .media-tab {
+      flex: 1;
+      min-height: 34px;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: #888;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+    }
+    .media-tab.active {
+      background: #2a2a2a;
       color: #fff;
     }
 
@@ -401,8 +437,8 @@
 
   <div class="top-bar">
     <div class="top-title-group">
-      <h1>TrackMyWatchList</h1>
-      <span class="version-badge">v3.7</span>
+      <h1>TrackMyList</h1>
+      <span class="version-badge">v4.0</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" id="btnExport">📥 Export</button>
@@ -411,9 +447,10 @@
   </div>
 
   <div class="tabs">
-    <button type="button" class="tab active" data-tab="watchlist" id="tabWatchlist">My Watchlist</button>
-    <button type="button" class="tab" data-tab="tv" id="tabTv">Add TV Shows</button>
-    <button type="button" class="tab" data-tab="movie" id="tabMovie">Add Movies</button>
+    <button type="button" class="tab active" data-tab="watchlist" id="tabWatchlist">My List</button>
+    <button type="button" class="tab" data-tab="tv" id="tabTv">Add TV</button>
+    <button type="button" class="tab" data-tab="movie" id="tabMovie">Add Movie</button>
+    <button type="button" class="tab" data-tab="book" id="tabBook">Add Book</button>
   </div>
 
   <div id="searchSection" style="display:none;">
@@ -425,16 +462,18 @@
   </div>
 
   <div id="controlsSection" class="controls-panel">
-    <div class="status-pills">
-      <button type="button" class="pill active" data-filter="all" id="pillAll">All</button>
-      <button type="button" class="pill" data-filter="watching" id="pillWatching">📺 Watching</button>
-      <button type="button" class="pill" data-filter="to_watch" id="pillToWatch">🍿 To Watch</button>
-      <button type="button" class="pill" data-filter="favorites" id="pillFavorites">⭐ Favorites</button>
-      <button type="button" class="pill" data-filter="completed" id="pillCompleted">✓ Finished</button>
+    <!-- Granular Media Sub-Tabs inside Watchlist -->
+    <div class="media-subtabs">
+      <button type="button" class="media-tab active" data-media="tv">📺 TV Shows</button>
+      <button type="button" class="media-tab" data-media="movie">🎬 Movies</button>
+      <button type="button" class="media-tab" data-media="book">📚 Books</button>
     </div>
 
+    <!-- Context-Aware Status Filter Pills -->
+    <div class="status-pills" id="statusPillsContainer"></div>
+
     <div class="sub-controls">
-      <input type="text" id="filterInput" placeholder="Filter by title, genre, director, actor...">
+      <input type="text" id="filterInput" placeholder="Filter by title, creator, genre...">
       <button type="button" class="view-toggle" id="viewToggleBtn">☰ Compact</button>
     </div>
   </div>
@@ -457,6 +496,7 @@
 
     // 3. Application State
     var currentTab = 'watchlist';
+    var currentMediaSubtab = 'tv'; // 'tv' | 'movie' | 'book'
     var currentStatusFilter = 'all';
     var isCompactView = false;
     var expandedShows = {};
@@ -474,9 +514,11 @@
           year: item.year || '',
           director: item.director || '',
           actors: item.actors || '',
+          author: item.author || '',
           genres: item.genres || [],
           image: item.image || '',
           watched: item.watched === true,
+          bookStatus: item.bookStatus || (item.watched ? 'completed' : 'plan'), // 'plan' | 'reading' | 'completed'
           nextAirDate: item.nextAirDate || 'TBD',
           nextEpisodeTitle: item.nextEpisodeTitle || '',
           nextAirStamp: item.nextAirStamp || null,
@@ -546,8 +588,46 @@
       return { total: total, watched: watched, favorites: favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
     }
 
+    // Dynamic Filter Pills Generator based on active Media Sub-Tab
+    function renderStatusPills() {
+      var container = document.getElementById('statusPillsContainer');
+      if (!container) return;
+
+      var pills = [];
+      if (currentMediaSubtab === 'tv') {
+        pills = [
+          { id: 'all', label: 'All' },
+          { id: 'watching', label: '📺 Watching' },
+          { id: 'completed', label: '✓ Finished' },
+          { id: 'favorites', label: '⭐ Favorites' }
+        ];
+      } else if (currentMediaSubtab === 'movie') {
+        pills = [
+          { id: 'all', label: 'All' },
+          { id: 'to_watch', label: '🍿 To Watch' },
+          { id: 'completed', label: '✓ Watched' }
+        ];
+      } else if (currentMediaSubtab === 'book') {
+        pills = [
+          { id: 'all', label: 'All' },
+          { id: 'reading', label: '📖 Reading' },
+          { id: 'plan', label: '📌 Want to Read' },
+          { id: 'completed', label: '✓ Finished' }
+        ];
+      }
+
+      var html = '';
+      for (var i = 0; i < pills.length; i++) {
+        var p = pills[i];
+        var activeClass = (p.id === currentStatusFilter) ? 'active' : '';
+        html += '<button type="button" class="pill ' + activeClass + '" data-filter="' + p.id + '">' + p.label + '</button>';
+      }
+      container.innerHTML = html;
+    }
+
     // 4. Render Engine
     function appRender() {
+      renderStatusPills();
       var container = document.getElementById('itemsContainer');
       var heading = document.getElementById('listHeading');
       if (!container || !heading) return;
@@ -556,41 +636,41 @@
 
       if (currentTab === 'watchlist') {
         var filter = (document.getElementById('filterInput') ? document.getElementById('filterInput').value : '').toLowerCase().trim();
+        
         itemsToRender = watchlist.filter(function(item) {
-          if (currentStatusFilter === 'to_watch' && (item.type !== 'movie' || item.watched)) return false;
-          if (currentStatusFilter === 'watching') {
-            if (item.type !== 'tv') return false;
+          // Strictly filter by Media Sub-Tab
+          if (item.type !== currentMediaSubtab) return false;
+
+          // Status Filter Logic
+          if (currentMediaSubtab === 'tv') {
             var st = getStats(item.seasons);
-            if (st.watched >= st.total) return false;
-          }
-          if (currentStatusFilter === 'completed') {
-            if (item.type === 'movie' && !item.watched) return false;
-            if (item.type === 'tv') {
-              var stComplete = getStats(item.seasons);
-              if (stComplete.total === 0 || stComplete.watched < stComplete.total) return false;
-            }
-          }
-          if (currentStatusFilter === 'favorites') {
-            if (item.type === 'tv') {
-              var stFav = getStats(item.seasons);
-              if (stFav.favorites === 0) return false;
-            } else return false;
+            if (currentStatusFilter === 'watching' && st.watched >= st.total) return false;
+            if (currentStatusFilter === 'completed' && (st.total === 0 || st.watched < st.total)) return false;
+            if (currentStatusFilter === 'favorites' && st.favorites === 0) return false;
+          } else if (currentMediaSubtab === 'movie') {
+            if (currentStatusFilter === 'to_watch' && item.watched) return false;
+            if (currentStatusFilter === 'completed' && !item.watched) return false;
+          } else if (currentMediaSubtab === 'book') {
+            if (currentStatusFilter === 'reading' && item.bookStatus !== 'reading') return false;
+            if (currentStatusFilter === 'plan' && item.bookStatus !== 'plan') return false;
+            if (currentStatusFilter === 'completed' && item.bookStatus !== 'completed') return false;
           }
 
           if (!filter) return true;
           var matchName = item.name && item.name.toLowerCase().indexOf(filter) !== -1;
-          if (item.type === 'tv') return matchName;
           return matchName ||
                  (item.director && item.director.toLowerCase().indexOf(filter) !== -1) ||
+                 (item.author && item.author.toLowerCase().indexOf(filter) !== -1) ||
                  (item.actors && item.actors.toLowerCase().indexOf(filter) !== -1) ||
                  (Array.isArray(item.genres) && item.genres.some(function(g) { return g.toLowerCase().indexOf(filter) !== -1; }));
         });
 
+        var mediaLabel = currentMediaSubtab === 'tv' ? 'TV Shows' : (currentMediaSubtab === 'movie' ? 'Movies' : 'Books');
         heading.style.display = 'block';
-        heading.textContent = 'My Watchlist (' + itemsToRender.length + (itemsToRender.length !== watchlist.length ? ' of ' + watchlist.length : '') + ')';
+        heading.textContent = mediaLabel + ' (' + itemsToRender.length + ')';
 
         if (!itemsToRender.length) {
-          container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No items found. Tap "Add TV Shows" or "Add Movies" above to add titles.</div>';
+          container.innerHTML = '<div style="color:#666; font-size:13px; padding:16px 0;">No ' + mediaLabel.toLowerCase() + ' found in this view.</div>';
           return;
         }
       } else {
@@ -612,7 +692,7 @@
         }
 
         heading.style.display = 'block';
-        heading.textContent = 'Already in Watchlist (' + itemsToRender.length + ')';
+        heading.textContent = 'Already in List (' + itemsToRender.length + ')';
       }
 
       container.className = isCompactView ? 'compact-mode' : '';
@@ -638,6 +718,23 @@
               '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
             '</div>' +
           '</div>';
+        } else if (item.type === 'book') {
+          var statusClass = item.bookStatus === 'completed' ? 'btn-watched' : (item.bookStatus === 'reading' ? 'btn-reading' : 'btn-plan');
+          var statusText = item.bookStatus === 'completed' ? '✓ Finished' : (item.bookStatus === 'reading' ? '📖 Reading' : '📌 Want to Read');
+
+          html += '<div class="card-container">' +
+            '<div class="card-main">' +
+              (item.image ? '<img src="' + escapeHtml(item.image) + '" class="poster" loading="lazy">' : '<div class="poster"></div>') +
+              '<div class="info">' +
+                '<div class="title">' + escapeHtml(item.name) + ' <span style="color:#888; font-size:12px;">(' + escapeHtml(item.year) + ')</span></div>' +
+                '<div class="sub" style="color:#38bdf8;">Author: ' + escapeHtml(item.author || 'Unknown') + '</div>' +
+                '<button type="button" class="btn-action ' + statusClass + '" data-action="cycle-book" data-id="' + sId + '">' +
+                  statusText + ' ▾' +
+                '</button>' +
+              '</div>' +
+              '<button type="button" class="delete-btn" data-action="delete" data-id="' + sId + '">✕</button>' +
+            '</div>' +
+          '</div>';
         } else {
           var stats = getStats(item.seasons);
           var isShowExpanded = Boolean(expandedShows[sId]);
@@ -646,7 +743,7 @@
           if (item.nextAirStamp) {
             var d = new Date(item.nextAirStamp);
             var iso = d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-            calLink = '<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('New ' + item.name + ' Episode') + '&dates=' + iso + '/' + iso + '&details=' + encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing') + '">📅 Calendar</a>';
+            calLink = '<a class="btn-cal" target="_blank" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('New ' + item.name + ' Episode') + '&dates=' + iso + '/' + iso + '&details=' + encodeURIComponent(item.nextEpisodeTitle || 'New Episode Airing')}">📅 Calendar</a>';
           }
 
           var episodesHtml = '';
@@ -731,6 +828,26 @@
 
     // 5. Centralized Event Delegation
     document.addEventListener('click', function(e) {
+      // Handle Filter Pills
+      var pillTarget = e.target.closest('.pill[data-filter]');
+      if (pillTarget) {
+        currentStatusFilter = pillTarget.getAttribute('data-filter');
+        appRender();
+        return;
+      }
+
+      // Handle Media Sub-Tabs
+      var mediaTabTarget = e.target.closest('.media-tab');
+      if (mediaTabTarget) {
+        currentMediaSubtab = mediaTabTarget.getAttribute('data-media');
+        currentStatusFilter = 'all'; // reset to 'all' on media tab switch
+        var allSubtabs = document.querySelectorAll('.media-tab');
+        for (var m = 0; m < allSubtabs.length; m++) allSubtabs[m].classList.remove('active');
+        mediaTabTarget.classList.add('active');
+        appRender();
+        return;
+      }
+
       var target = e.target.closest('[data-action]');
       if (!target) return;
 
@@ -803,6 +920,18 @@
         });
         appSave();
       }
+      else if (action === 'cycle-book') {
+        var bId = String(target.getAttribute('data-id'));
+        watchlist.forEach(function(item) {
+          if (String(item.id) === bId) {
+            // Cycle: plan -> reading -> completed -> plan
+            if (item.bookStatus === 'plan') item.bookStatus = 'reading';
+            else if (item.bookStatus === 'reading') item.bookStatus = 'completed';
+            else item.bookStatus = 'plan';
+          }
+        });
+        appSave();
+      }
       else if (action === 'delete') {
         var dId = String(target.getAttribute('data-id'));
         if (confirm('Remove this title from your list?')) {
@@ -839,25 +968,15 @@
         } else {
           searchSection.style.display = 'block';
           controlsSection.style.display = 'none';
-          searchInput.placeholder = 'Search ' + (currentTab === 'tv' ? 'TV shows' : 'movies') + ' online...';
+          var promptLabel = currentTab === 'tv' ? 'TV shows' : (currentTab === 'movie' ? 'movies' : 'books');
+          searchInput.placeholder = 'Search ' + promptLabel + ' online...';
           searchInput.focus();
         }
         appRender();
       });
     }
 
-    // 7. Filter Pills
-    var pillBtns = document.querySelectorAll('.status-pills .pill');
-    for (var pI = 0; pI < pillBtns.length; pI++) {
-      pillBtns[pI].addEventListener('click', function() {
-        currentStatusFilter = this.getAttribute('data-filter');
-        for (var k = 0; k < pillBtns.length; k++) pillBtns[k].classList.remove('active');
-        this.classList.add('active');
-        appRender();
-      });
-    }
-
-    // 8. Compact View Toggle
+    // 7. Compact View Toggle
     document.getElementById('viewToggleBtn').addEventListener('click', function() {
       isCompactView = !isCompactView;
       this.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
@@ -866,7 +985,7 @@
 
     document.getElementById('filterInput').addEventListener('input', appRender);
 
-    // 9. Export & Import
+    // 8. Export & Import
     document.getElementById('btnExport').addEventListener('click', function() {
       var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(watchlist, null, 2));
       var a = document.createElement('a');
@@ -904,7 +1023,7 @@
       reader.readAsText(file);
     });
 
-    // 10. Search Online with Smart Fallbacks
+    // 9. Search Online (TVMaze for TV, OMDb for Movies, OpenLibrary for Books)
     document.getElementById('btnSearch').addEventListener('click', executeSearch);
     document.getElementById('searchInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') executeSearch();
@@ -930,10 +1049,31 @@
             };
           });
           renderDropdown(currentSearchResults);
+        } else if (currentTab === 'book') {
+          // Open Library Search
+          var bRes = await fetch('https://openlibrary.org/search.json?q=' + encodeURIComponent(q) + '&limit=8');
+          var bData = await bRes.json();
+          if (bData.docs && bData.docs.length > 0) {
+            currentSearchResults = bData.docs.map(function(b) {
+              var coverId = b.cover_i;
+              return {
+                id: b.key ? b.key.replace('/works/', '') : String(Math.random()),
+                name: b.title + (b.first_publish_year ? ' (' + b.first_publish_year + ')' : ''),
+                rawTitle: b.title,
+                author: b.author_name ? b.author_name.join(', ') : 'Unknown Author',
+                year: b.first_publish_year ? String(b.first_publish_year) : '',
+                image: coverId ? 'https://covers.openlibrary.org/b/id/' + coverId + '-M.jpg' : '',
+                type: 'book'
+              };
+            });
+            renderDropdown(currentSearchResults);
+          } else {
+            resBox.innerHTML = '<div style="padding:12px; color:#888;">No books found.</div>';
+          }
         } else {
+          // OMDb Movie Search with Smart Fallbacks
           var cleanQuery = q.trim();
           
-          // 1. Direct IMDb ID support
           if (/^tt\d+/i.test(cleanQuery)) {
             var directRes = await fetch('https://www.omdbapi.com/?i=' + encodeURIComponent(cleanQuery) + '&apikey=' + OMDB_KEY);
             var directData = await directRes.json();
@@ -960,13 +1100,11 @@
           var mRes = await fetch('https://www.omdbapi.com/?s=' + encodeURIComponent(titleQuery) + yearQuery + '&type=movie&apikey=' + OMDB_KEY);
           var mData = await mRes.json();
 
-          // Fallback: search without year if year query failed
           if (mData.Response !== 'True' && yearQuery) {
             mRes = await fetch('https://www.omdbapi.com/?s=' + encodeURIComponent(titleQuery) + '&type=movie&apikey=' + OMDB_KEY);
             mData = await mRes.json();
           }
 
-          // Fallback: exact title lookup (?t=)
           if (mData.Response !== 'True') {
             mRes = await fetch('https://www.omdbapi.com/?t=' + encodeURIComponent(titleQuery) + '&type=movie&apikey=' + OMDB_KEY);
             var exactData = await mRes.json();
@@ -1038,6 +1176,17 @@
             image: d.Poster && d.Poster !== 'N/A' ? d.Poster : '',
             watched: false
           });
+        } else if (item.type === 'book') {
+          watchlist.push({
+            id: String(item.id),
+            type: 'book',
+            name: item.rawTitle || item.name,
+            author: item.author || 'Unknown',
+            year: item.year || '',
+            image: item.image || '',
+            bookStatus: 'plan', // starts as 'Want to Read'
+            watched: false
+          });
         } else {
           var epRes = await fetch('https://api.tvmaze.com/shows/' + item.id + '/episodes');
           var rawEpisodes = await epRes.json();
@@ -1077,6 +1226,7 @@
         }
 
         appSave();
+        currentMediaSubtab = item.type; // Automatically switch to the media tab of the newly added item
         document.getElementById('tabWatchlist').click();
       } catch (e) {
         alert('Could not fetch details.');
