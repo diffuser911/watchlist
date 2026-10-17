@@ -6,7 +6,7 @@
   <title>TrackMyList</title>
   <meta name="theme-color" content="#121212">
   <link rel="manifest" href="./manifest.json">
-  <script src="./config.js" onerror="console.log('No external config.js found; using defaults.')"></script>
+  <script src="./config.js" onerror="console.log('No external config.js detected.')"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -439,7 +439,7 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyList</h1>
-      <span class="version-badge">v4.4</span>
+      <span class="version-badge">v4.5</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" data-action="export">📥 Export</button>
@@ -490,8 +490,8 @@
     var currentSearchResults = [];
     var watchlist = [];
 
-    // 1. Rock-solid event delegation: registered first so clicks NEVER drop
-    function handleGlobalTap(e) {
+    // Native Central Event Handler: Defers heavy re-renders via setTimeout so mobile touch pipelines complete cleanly
+    document.addEventListener('click', function(e) {
       var target = e.target.closest('[data-action]');
       if (!target) return;
 
@@ -522,7 +522,7 @@
           searchInput.placeholder = 'Search ' + promptLabel + ' online...';
           searchInput.focus();
         }
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'media-tab') {
         currentMediaSubtab = target.getAttribute('data-media');
@@ -530,22 +530,22 @@
         var allSubtabs = document.querySelectorAll('.media-tab');
         for (var m = 0; m < allSubtabs.length; m++) allSubtabs[m].classList.remove('active');
         target.classList.add('active');
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'filter-pill') {
         currentStatusFilter = target.getAttribute('data-filter');
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'toggle-view') {
         isCompactView = !isCompactView;
         var toggleBtn = document.getElementById('viewToggleBtn');
         if (toggleBtn) toggleBtn.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'toggle-show') {
         var id = String(target.getAttribute('data-id'));
         expandedShows[id] = !expandedShows[id];
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'toggle-season') {
         if (e.target.closest('.bulk-btn')) return;
@@ -553,7 +553,7 @@
         var season = target.getAttribute('data-season');
         var sKey = showId + '_' + season;
         expandedSeasons[sKey] = !expandedSeasons[sKey];
-        appRender();
+        setTimeout(appRender, 0);
       }
       else if (action === 'toggle-ep') {
         var showIdEp = String(target.getAttribute('data-show'));
@@ -567,7 +567,7 @@
             });
           }
         });
-        appSave();
+        setTimeout(appSave, 0);
       }
       else if (action === 'fav-ep') {
         var showIdFav = String(target.getAttribute('data-show'));
@@ -581,7 +581,7 @@
             });
           }
         });
-        appSave();
+        setTimeout(appSave, 0);
       }
       else if (action === 'bulk-season') {
         var showIdBulk = String(target.getAttribute('data-show'));
@@ -596,14 +596,14 @@
             });
           }
         });
-        appSave();
+        setTimeout(appSave, 0);
       }
       else if (action === 'toggle-movie') {
         var mId = String(target.getAttribute('data-id'));
         watchlist.forEach(function(item) {
           if (String(item.id) === mId) item.watched = !item.watched;
         });
-        appSave();
+        setTimeout(appSave, 0);
       }
       else if (action === 'cycle-book') {
         var bId = String(target.getAttribute('data-id'));
@@ -614,13 +614,13 @@
             else item.bookStatus = 'plan';
           }
         });
-        appSave();
+        setTimeout(appSave, 0);
       }
       else if (action === 'delete') {
         var dId = String(target.getAttribute('data-id'));
         if (confirm('Remove this title from your list?')) {
           watchlist = watchlist.filter(function(w) { return String(w.id) !== dId; });
-          appSave();
+          setTimeout(appSave, 0);
         }
       }
       else if (action === 'add-result') {
@@ -646,11 +646,9 @@
       else if (action === 'search-btn') {
         executeSearch();
       }
-    }
+    });
 
-    document.addEventListener('click', handleGlobalTap);
-
-    // 2. Safe, 100% backward-compatible JSON normalizer
+    // 2. Backward-compatible data normalizer
     function normalizeWatchlist(items) {
       if (!Array.isArray(items)) return [];
       return items.map(function(item) {
@@ -989,7 +987,9 @@
 
     var filterInputElem = document.getElementById('filterInput');
     if (filterInputElem) {
-      filterInputElem.addEventListener('input', appRender);
+      filterInputElem.addEventListener('input', function() {
+        setTimeout(appRender, 0);
+      });
     }
 
     var importFileElem = document.getElementById('importFileInput');
@@ -1123,7 +1123,7 @@
       } catch (err) {
         resBox.innerHTML = '<div style="padding:12px; color:#ff5555;">Search failed. Verify network.</div>';
       }
-      appRender();
+      setTimeout(appRender, 0);
     }
 
     function renderDropdown(items) {
@@ -1238,14 +1238,14 @@
         if (searchSection) searchSection.style.display = 'none';
         if (controlsSection) controlsSection.style.display = 'block';
 
-        appRender();
+        setTimeout(appRender, 0);
       } catch (e) {
         alert('Could not fetch details.');
       }
     }
 
-    // Mount initial display
-    appRender();
+    // Initial load
+    setTimeout(appRender, 0);
   </script>
 </body>
 </html>
