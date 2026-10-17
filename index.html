@@ -63,7 +63,7 @@
       background: #262626;
       border: 1px solid #444;
       color: #eee;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 500;
@@ -87,7 +87,7 @@
       border-color: #a16207 !important;
     }
 
-    /* Top Tabs */
+    /* Top Navigation Tabs */
     .tabs {
       display: flex;
       background: #1e1e1e;
@@ -112,7 +112,7 @@
       color: #fff;
     }
 
-    /* Media Sub-Tabs */
+    /* Media Sub-Tabs (inside My List) */
     .media-subtabs {
       display: flex;
       background: #161616;
@@ -440,7 +440,7 @@
   <div class="top-bar">
     <div class="top-title-group">
       <h1>TrackMyList</h1>
-      <span class="version-badge">v5.0</span>
+      <span class="version-badge">v6.0</span>
     </div>
     <div class="top-actions">
       <button type="button" class="btn-action" id="btnExport">📥 Export</button>
@@ -448,6 +448,7 @@
     </div>
   </div>
 
+  <!-- Top Navigation Tabs (Exact v3.7 structure) -->
   <div class="tabs">
     <button type="button" class="tab active" data-tab="watchlist" id="tabWatchlist">My List</button>
     <button type="button" class="tab" data-tab="tv" id="tabTv">Add TV</button>
@@ -464,13 +465,14 @@
   </div>
 
   <div id="controlsSection" class="controls-panel">
+    <!-- Media Sub-tabs -->
     <div class="media-subtabs">
-      <button type="button" class="media-tab active" data-media="tv">📺 TV Shows</button>
-      <button type="button" class="media-tab" data-media="movie">🎬 Movies</button>
-      <button type="button" class="media-tab" data-media="book">📚 Books</button>
+      <button type="button" class="media-tab active" data-media="tv" id="subtabTv">📺 TV Shows</button>
+      <button type="button" class="media-tab" data-media="movie" id="subtabMovie">🎬 Movies</button>
+      <button type="button" class="media-tab" data-media="book" id="subtabBook">📚 Books</button>
     </div>
 
-    <!-- Static status pills containers; displayed according to active media subtab -->
+    <!-- Static, Permanent Status Pill Groups -->
     <div class="status-pills" id="pillsTv">
       <button type="button" class="pill active" data-filter="all">All</button>
       <button type="button" class="pill" data-filter="watching">📺 Watching</button>
@@ -499,12 +501,10 @@
   <div id="itemsContainer"></div>
 
   <script>
-    // 1. Service Worker Registration
+    // 1. Service Worker for PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js').then(function(reg) {
-          reg.update();
-        }).catch(function(err) {});
+        navigator.serviceWorker.register('./sw.js').catch(function() {});
       });
     }
 
@@ -526,7 +526,7 @@
       return items.map(function(item) {
         if (!item) return null;
         var mediaType = item.type || (Array.isArray(item.seasons) ? 'tv' : 'movie');
-        
+
         var norm = {
           id: String(item.id || Math.random()),
           type: mediaType,
@@ -547,7 +547,8 @@
 
         if (norm.type === 'tv' && Array.isArray(item.seasons)) {
           norm.seasons = item.seasons.map(function(s) {
-            var episodes = Array.isArray(s.episodes) ? s.episodes.map(function(ep) {
+            var rawEps = Array.isArray(s.episodes) ? s.episodes : [];
+            var episodes = rawEps.map(function(ep) {
               return {
                 id: String(ep.id || Math.random()),
                 name: ep.name || '',
@@ -557,7 +558,7 @@
                 watched: ep.watched === true,
                 favorite: ep.favorite === true
               };
-            }) : [];
+            });
 
             var detectedYear = s.year ? String(s.year) : '';
             if (!detectedYear && episodes.length > 0 && episodes[0].airdate && episodes[0].airdate.length >= 4) {
@@ -605,42 +606,17 @@
       var total = 0, watched = 0, favorites = 0;
       if (!Array.isArray(seasons)) return { total: 0, watched: 0, favorites: 0, pct: 0 };
       seasons.forEach(function(s) {
-        if (Array.isArray(s.episodes)) {
-          s.episodes.forEach(function(ep) {
-            total++;
-            if (ep.watched) watched++;
-            if (ep.favorite) favorites++;
-          });
-        }
+        (s.episodes || []).forEach(function(ep) {
+          total++;
+          if (ep.watched) watched++;
+          if (ep.favorite) favorites++;
+        });
       });
       return { total: total, watched: watched, favorites: favorites, pct: total ? Math.round((watched / total) * 100) : 0 };
     }
 
-    function syncPillsVisibility() {
-      var pTv = document.getElementById('pillsTv');
-      var pMovie = document.getElementById('pillsMovie');
-      var pBook = document.getElementById('pillsBook');
-      if (!pTv || !pMovie || !pBook) return;
-
-      pTv.style.display = currentMediaSubtab === 'tv' ? 'flex' : 'none';
-      pMovie.style.display = currentMediaSubtab === 'movie' ? 'flex' : 'none';
-      pBook.style.display = currentMediaSubtab === 'book' ? 'flex' : 'none';
-
-      // Update active pill styling within current visible group
-      var activeGroup = currentMediaSubtab === 'tv' ? pTv : (currentMediaSubtab === 'movie' ? pMovie : pBook);
-      var pills = activeGroup.querySelectorAll('.pill');
-      for (var i = 0; i < pills.length; i++) {
-        if (pills[i].getAttribute('data-filter') === currentStatusFilter) {
-          pills[i].classList.add('active');
-        } else {
-          pills[i].classList.remove('active');
-        }
-      }
-    }
-
-    // 3. Render Engine
+    // 3. Render Engine (Pure v3.7 style - only mutates itemsContainer and heading)
     function appRender() {
-      syncPillsVisibility();
       var container = document.getElementById('itemsContainer');
       var heading = document.getElementById('listHeading');
       if (!container || !heading) return;
@@ -843,7 +819,7 @@
       container.innerHTML = html;
     }
 
-    // 4. Centralized Event Delegation (Only for internal card actions)
+    // 4. Centralized Event Delegation (Pure v3.7 structure for cards)
     document.addEventListener('click', function(e) {
       var target = e.target.closest('[data-action]');
       if (!target) return;
@@ -937,7 +913,7 @@
       }
     });
 
-    // 5. Dedicated Listeners for Top Navigation (Direct, exact matching from v3.7)
+    // 5. Direct Navigation Listeners (Exact v3.7 pattern: rock-solid on mobile)
     var tabBtns = document.querySelectorAll('.tab');
     for (var tI = 0; tI < tabBtns.length; tI++) {
       tabBtns[tI].addEventListener('click', function(e) {
@@ -976,22 +952,38 @@
         currentStatusFilter = 'all';
         for (var k = 0; k < mediaTabs.length; k++) mediaTabs[k].classList.remove('active');
         this.classList.add('active');
+
+        // Switch visible pill container
+        document.getElementById('pillsTv').style.display = currentMediaSubtab === 'tv' ? 'flex' : 'none';
+        document.getElementById('pillsMovie').style.display = currentMediaSubtab === 'movie' ? 'flex' : 'none';
+        document.getElementById('pillsBook').style.display = currentMediaSubtab === 'book' ? 'flex' : 'none';
+
+        // Reset active pill to 'All'
+        var allPills = document.querySelectorAll('.status-pills .pill');
+        for (var p = 0; p < allPills.length; p++) {
+          if (allPills[p].getAttribute('data-filter') === 'all') allPills[p].classList.add('active');
+          else allPills[p].classList.remove('active');
+        }
+
         appRender();
       });
     }
 
-    // Static Status Pills delegation
+    // Static Status Pills: bound to their containers once, never destroyed
     var pillContainers = document.querySelectorAll('.status-pills');
     for (var pcI = 0; pcI < pillContainers.length; pcI++) {
       pillContainers[pcI].addEventListener('click', function(e) {
         var pill = e.target.closest('.pill');
         if (!pill) return;
         currentStatusFilter = pill.getAttribute('data-filter');
+        var siblingPills = this.querySelectorAll('.pill');
+        for (var s = 0; s < siblingPills.length; s++) siblingPills[s].classList.remove('active');
+        pill.classList.add('active');
         appRender();
       });
     }
 
-    // Compact View Toggle
+    // Compact Toggle
     document.getElementById('viewToggleBtn').addEventListener('click', function() {
       isCompactView = !isCompactView;
       this.textContent = isCompactView ? '▤ Detailed' : '☰ Compact';
@@ -1244,28 +1236,19 @@
         currentMediaSubtab = item.type;
         currentTab = 'watchlist';
 
-        var allTabs = document.querySelectorAll('.tab');
-        for (var k = 0; k < allTabs.length; k++) allTabs[k].classList.remove('active');
+        // Select the right media subtab button
+        var mTarget = item.type === 'tv' ? 'subtabTv' : (item.type === 'movie' ? 'subtabMovie' : 'subtabBook');
+        var subtabEl = document.getElementById(mTarget);
+        if (subtabEl) subtabEl.click();
+
         var defaultTab = document.getElementById('tabWatchlist');
-        if (defaultTab) defaultTab.classList.add('active');
-
-        var allMediaTabs = document.querySelectorAll('.media-tab');
-        for (var m = 0; m < allMediaTabs.length; m++) allMediaTabs[m].classList.remove('active');
-        var activeMediaTab = document.querySelector('.media-tab[data-media="' + item.type + '"]');
-        if (activeMediaTab) activeMediaTab.classList.add('active');
-
-        var searchSection = document.getElementById('searchSection');
-        var controlsSection = document.getElementById('controlsSection');
-        if (searchSection) searchSection.style.display = 'none';
-        if (controlsSection) controlsSection.style.display = 'block';
-
-        appRender();
+        if (defaultTab) defaultTab.click();
       } catch (e) {
         alert('Could not fetch details.');
       }
     }
 
-    // Initial mount
+    // Initial render
     appRender();
   </script>
 </body>
